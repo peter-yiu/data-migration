@@ -1,0 +1,267 @@
+
+mybatis-data-migration
+│
+├── src
+│   ├── main
+│   │   ├── java
+│   │   │   └── com
+│   │   │       └── example
+│   │   │           ├── MyBatisUtil.java
+│   │   │           ├── DataExportService.java
+│   │   │           ├── DataImportService.java
+│   │   │           ├── Application.java
+│   │   ├── resources
+│   │       ├── mybatis-config.xml
+│   │       ├── mapper
+│   │       │   └── GenericMapper.xml
+│   │       └── application.properties
+│   └── test
+│       └── java
+│           └── com
+│               └── example
+│                   └── DataMigrationTest.java
+└── pom.xml
+
+首先，创建一个 Maven 项目，配置 pom.xml 以包含 MyBatis 和其他必要的依赖。
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>mybatis-data-migration</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- MyBatis -->
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis</artifactId>
+            <version>3.5.10</version>
+        </dependency>
+
+        <!-- MySQL Connector -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.33</version>
+        </dependency>
+
+        <!-- Log4j -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.17.1</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>11</source>
+                    <target>11</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+2.2 配置 MyBatis
+
+在 src/main/resources 目录下创建 mybatis-config.xml 文件，配置 MyBatis 的基本设置。
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+    <environments default="development">
+        <environment id="development">
+            <transactionManager type="JDBC"/>
+            <dataSource type="POOLED">
+                <property name="driver" value="com.mysql.cj.jdbc.Driver"/>
+                <property name="url" value="${db.url}"/>
+                <property name="username" value="${db.username}"/>
+                <property name="password" value="${db.password}"/>
+            </dataSource>
+        </environment>
+    </environments>
+
+    <mappers>
+        <mapper resource="mapper/GenericMapper.xml"/>
+    </mappers>
+</configuration>
+
+在 src/main/resources/application.properties 中配置数据库连接信息：
+db.url=jdbc:mysql://localhost:3306/your_database
+db.username=root
+db.password=your_password
+
+2.3 创建 MyBatis 工具类
+
+创建 MyBatisUtil 类，用于初始化 MyBatis 会话。
+package com.example;
+
+import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
+
+import java.io.IOException;
+import java.io.Reader;
+
+public class MyBatisUtil {
+    private static SqlSessionFactory sqlSessionFactory;
+
+    static {
+        try {
+            Reader reader = Resources.getResourceAsReader("mybatis-config.xml");
+            sqlSessionFactory = new SqlSessionFactoryBuilder().build(reader);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static SqlSessionFactory getSqlSessionFactory() {
+        return sqlSessionFactory;
+    }
+}
+
+2.4 创建通用的 Mapper XML
+
+在 src/main/resources/mapper 目录下创建 GenericMapper.xml 文件，用于处理动态 SQL。
+
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="GenericMapper">
+    <select id="selectAll" resultType="map">
+        SELECT * FROM ${tableName}
+    </select>
+
+    <insert id="insertData">
+        INSERT INTO ${tableName} (${columns}) VALUES (${values})
+    </insert>
+</mapper>
+
+2.5 实现数据导出和导入服务
+2.5.1 数据导出服务
+
+package com.example;
+
+import org.apache.ibatis.session.SqlSession;
+
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+
+public class DataExportService {
+
+    public void exportData(String tableName, String filePath) {
+        try (SqlSession session = MyBatisUtil.getSqlSessionFactory().openSession();
+             BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+
+            List<Map<String, Object>> results = session.selectList("GenericMapper.selectAll", tableName);
+            if (!results.isEmpty()) {
+                String header = String.join(",", results.get(0).keySet());
+                writer.write(header);
+                writer.newLine();
+
+                for (Map<String, Object> row : results) {
+                    String line = String.join(",", row.values().stream()
+                            .map(value -> value == null ? "" : value.toString())
+                            .toArray(String[]::new));
+                    writer.write(line);
+                    writer.newLine();
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+2.5.2 数据导入服务
+
+package com.example;
+
+import org.apache.ibatis.session.SqlSession;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+public class DataImportService {
+
+    public void importData(String tableName, String filePath) {
+        try (SqlSession session = MyBatisUtil.getSqlSessionFactory().openSession();
+             BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+
+            String headerLine = reader.readLine();
+            String[] columns = headerLine.split(",");
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] values = line.split(",");
+                Map<String, Object> params = new HashMap<>();
+                params.put("tableName", tableName);
+                params.put("columns", String.join(",", columns));
+                params.put("values", String.join(",", values));
+
+                session.insert("GenericMapper.insertData", params);
+            }
+            session.commit();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+2.6 创建主程序类
+
+最后，创建 Application 类用于启动程序。
+
+package com.example;
+
+public class Application {
+    public static void main(String[] args) {
+        if (args.length < 3) {
+            System.out.println("Usage: java -jar mybatis-data-migration.jar [export|import] <tableName> <filePath>");
+            return;
+        }
+
+        String action = args[0];
+        String tableName = args[1];
+        String filePath = args[2];
+
+        if ("export".equalsIgnoreCase(action)) {
+            new DataExportService().exportData(tableName, filePath);
+        } else if ("import".equalsIgnoreCase(action)) {
+            new DataImportService().importData(tableName, filePath);
+        } else {
+            System.out.println("Unknown action: " + action);
+        }
+    }
+}
+
+3. 运行项目
+3.1 打包项目
+
+在项目根目录下运行以下命令，打包项目为可执行的 JAR 文件：
+mvn clean package
+
+3.2 运行数据导出
+
+java -jar target/mybatis-data-migration.jar
+

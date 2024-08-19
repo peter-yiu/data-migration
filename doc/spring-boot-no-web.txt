@@ -1,0 +1,120 @@
+spring-boot-starter-parent 是 Spring Boot 项目中常用的父 POM，它为 Spring Boot 应用提供了默认的依赖版本管理、插件配置以及其他构建相关的配置。但是在你提到的项目中，我们并没有使用 Spring Boot 的 Web 或其他特定功能，因此没有直接依赖 Spring Boot 的功能模块。
+
+不过，如果你希望利用 Spring Boot 提供的简化配置和管理功能（例如更容易的依赖版本管理、插件配置等），你可以使用 spring-boot-starter-parent 作为父 POM，尽管不需要使用 Spring Boot 的 Web 功能。
+修改 pom.xml 使用 spring-boot-starter-parent
+
+如果你决定使用 Spring Boot 的父 POM，可以按照下面的方式修改 pom.xml：
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.1.1</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>mybatis-data-migration</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- MyBatis -->
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis</artifactId>
+        </dependency>
+
+        <!-- MySQL Connector -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+        </dependency>
+
+        <!-- Log4j -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+使用 spring-boot-starter-parent 的好处
+
+    版本管理：Spring Boot 管理了许多常用依赖的版本，避免了手动指定每个依赖的版本号，减少了依赖冲突的风险。
+
+    简化插件配置：Spring Boot 父 POM 自动配置了许多常用的 Maven 插件，如编译插件、打包插件等。
+
+    快速启动：虽然你不需要 Web 环境，但使用 Spring Boot 的框架仍然可以更快地启动和管理应用程序。
+
+总结
+
+选择是否使用 spring-boot-starter-parent 主要取决于你是否希望利用 Spring Boot 提供的简化配置和管理功能。
+如果你的项目完全独立于 Spring Boot 的功能模块，也不需要它的版本管理和插件支持，则可以选择不使用它。但如果你希望更轻松地管理依赖和构建过程，使用 Spring Boot 的父 POM 是一个不错的选择。
+
+
+在 Spring Boot 中，如果你希望屏蔽 Web 环境，可以通过几种方式来实现：
+1. 设置 application.properties 或 application.yml
+
+你可以在 application.properties 或 application.yml 中通过配置 spring.main.web-application-type 来指定不使用 Web 环境。
+
+在 application.properties 中：
+
+spring.main.web-application-type=none
+
+在 application.yml 中：
+
+spring:
+  main:
+    web-application-type: none
+
+2. 在主类中通过代码配置
+
+你也可以在应用的主类中通过代码配置 Spring Boot 不启动 Web 环境。
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.WebApplicationType;
+
+@SpringBootApplication
+public class Application {
+
+    public static void main(String[] args) {
+        SpringApplication app = new SpringApplication(Application.class);
+        app.setWebApplicationType(WebApplicationType.NONE);
+        app.run(args);
+    }
+}
+
+
+3. 使用 @SpringBootApplication 的 exclude 参数
+
+你还可以通过排除特定的自动配置类来避免 Web 环境的加载。常见的排除 Web 环境的类是 WebMvcAutoConfiguration。
+
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
+
+@SpringBootApplication(exclude = WebMvcAutoConfiguration.class)
+public class Application {
+
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+}
+
+总结
+
+在 Spring Boot 项目中，通过设置 spring.main.web-application-type=none 是最直接且推荐的方式来屏蔽 Web 环境。如果你不需要 Web 环境（如 Servlet、Tomcat 等），设置这个属性可以确保 Spring Boot 只运行非 Web 环境下的配置，适用于命令行应用、批处理、后台服务等场景。
