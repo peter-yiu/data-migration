@@ -1,0 +1,74 @@
+为了避免克隆整个代码库，你可以使用 sparse-checkout 技术，它允许你只检出特定的文件或目录。下面是如何在 Azure Pipelines 中使用 sparse-checkout 来获取特定文件的步骤。
+1. Azure Pipelines YAML 示例
+
+yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- checkout: none
+
+- script: |
+    echo "Initializing a sparse checkout"
+    git init <repository-name>
+    cd <repository-name>
+
+    echo "Setting up remote and sparse-checkout"
+    git remote add origin https://github.com/<your-username>/<repository-name>.git
+    git config core.sparseCheckout true
+
+    # Specify the file or directory you want to checkout
+    echo "<file-path>" >> .git/info/sparse-checkout
+
+    echo "Fetching the specific branch"
+    git fetch origin <branch-name>
+    git checkout <branch-name>
+
+    echo "File fetched successfully!"
+  displayName: 'Sparse checkout specific file'
+
+- script: |
+    echo "Contents of the file:"
+    cat <file-path>
+  displayName: 'Display File Contents'
+
+2. 说明
+
+    git init <repository-name>:
+        初始化一个空的 Git 仓库。<repository-name> 是你要将仓库内容放置的目录名。
+
+    git remote add origin https://github.com/<your-username>/<repository-name>.git:
+        添加远程仓库 URL。
+
+    git config core.sparseCheckout true:
+        启用稀疏检出（sparse-checkout），只会检出你指定的文件或目录。
+
+    echo "<file-path>" >> .git/info/sparse-checkout:
+        将你想要检出的文件路径添加到稀疏检出配置中。替换 <file-path> 为你想要获取的文件路径，比如 src/config.json。
+
+    git fetch origin <branch-name>:
+        从远程仓库获取指定分支。
+
+    git checkout <branch-name>:
+        检出指定的分支，只有在稀疏检出配置中指定的文件会被下载。
+
+3. 替换字段
+
+    <your-username>: 替换为你的 GitHub 用户名。
+    <repository-name>: 替换为你的 GitHub 仓库名。
+    <branch-name>: 替换为你要获取文件的分支名称。
+    <file-path>: 替换为你要获取的文件的路径（如 src/config.json）。
+
+4. 注意事项
+
+    稀疏检出: 使用稀疏检出时，只有你指定的文件或目录会被检出，大大减少了不必要的数据传输。
+
+    分支管理: 在执行 git fetch 和 git checkout 时，请确保分支名称和路径正确，否则操作可能失败。
+
+    性能优化: 这种方式可以显著降低网络流量和磁盘使用，因为只下载和检出必要的文件，而不是整个代码库。
+
+通过这种方式，你可以在 Azure Pipelines 中高效地检出特定文件，而不需要下载整个代码库。
