@@ -280,3 +280,27 @@ powershell
 .\import-data.ps1
 
 通过这种方式，你可以导入使用制表符分隔的数据文件到 SQL Server 的指定表中。这种方法灵活且适合处理不同类型的分隔符。
+
+
+----------------
+
+# 配置参数
+$serverName = "your_server_name"  # 替换为你的服务器名称或 IP
+$databaseName = "your_database_name"  # 替换为你的数据库名称
+$tableName = "your_table_name"  # 替换为你的表名称
+$inputFile = "C:\path\to\input\file.tsv"  # 替换为你希望导入的 TSV 文件路径
+
+# 读取 TSV 文件（使用制表符作为分隔符）
+$csvData = Import-Csv -Path $inputFile -Delimiter "`t"
+
+# 遍历 CSV 数据并将其插入到数据库表中
+foreach ($row in $csvData) {
+    $columns = $row.PSObject.Properties.Name | ForEach-Object { "[$_]" } -join ","
+    $values = $row.PSObject.Properties.ValueForExtendedProperty("Name") | ForEach-Object { $_.Replace("'", "''") } -join "','"
+    $insertQuery = "INSERT INTO $tableName ($columns) VALUES ('$values')"
+
+    # 执行插入命令
+    Invoke-Sqlcmd -ServerInstance $serverName -Database $databaseName -Query $insertQuery
+}
+
+Write-Host "Data imported successfully from $inputFile"
