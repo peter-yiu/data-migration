@@ -310,6 +310,7 @@ Write-Host "Data imported successfully from $inputFile"
 
 # 获取 CSV 文件的列顺序（假设 CSV 第一行是列标题）
 $columnOrder = ($csvData | Get-Member -MemberType Properties).Name
+$columnOrder = $csvData[0].PSObject.Properties.Name
 
 # 遍历 CSV 数据并将其插入到数据库表中
 foreach ($row in $csvData) {
