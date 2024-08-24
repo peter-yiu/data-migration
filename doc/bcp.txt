@@ -395,3 +395,34 @@ foreach ($line in $lines) {
 解决方案验证
 
 通过以上方法，你应该能够正确读取单列数据，并确保在导入数据库时没有额外的空格。请确认你的 CSV 文件本身没有包含意外的空格或格式问题。
+
+
+
+
+方法 3: 手动指定列名但处理为字符串
+
+在读取 CSV 文件时，如果你的文件内容相对简单（如只有一列），可以通过手动指定列名来避免解析问题：
+
+powershell
+
+# 使用 Import-Csv 并手动指定列名为 "SingleColumn"
+$csvData = Import-Csv -Path $inputFile -Delimiter "`t" -Header "SingleColumn" -Encoding Unicode
+
+# 遍历 CSV 数据并将其插入到数据库表中
+foreach ($row in $csvData) {
+    # 直接访问数据
+    $value = $row.SingleColumn.Trim().Replace("'", "''")
+
+    # 构建 INSERT 语句
+    $insertQuery = "INSERT INTO $tableName (ColumnName) VALUES ('$value')"
+
+    # 输出 SQL 语句用于调试
+    Write-Host $insertQuery
+
+    # 执行插入命令
+    Invoke-Sqlcmd -ServerInstance $serverName -Database $databaseName -Query $insertQuery
+}
+
+总结
+
+如果你的文件只有一列或没有明确的列名，使用 -Header "SingleColumn" 手动指定列名通常可以解决问题。如果 Import-Csv 仍然导致所有行的数据相同，建议直接使用 Get-Content 来逐行处理数据。
