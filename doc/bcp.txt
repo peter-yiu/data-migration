@@ -320,3 +320,24 @@ foreach ($row in $csvData) {
     # 执行插入命令
     Invoke-Sqlcmd -ServerInstance $serverName -Database $databaseName -Query $insertQuery
 }
+
+
+
+
+# 读取没有列名的 CSV 文件并手动指定列名
+$csvData = Import-Csv -Path $inputFile -Delimiter "`t" -Header "SingleColumn"
+
+# 遍历 CSV 数据并将其插入到数据库表中
+foreach ($row in $csvData) {
+    # 提取单列数据并处理单引号转义
+    $value = $row.SingleColumn.Trim().Replace("'", "''")
+
+    # 构建 INSERT 语句
+    $insertQuery = "INSERT INTO $tableName (ColumnName) VALUES ('$value')"
+
+    # 输出 SQL 语句用于调试
+    Write-Host $insertQuery
+
+    # 执行插入命令
+    Invoke-Sqlcmd -ServerInstance $serverName -Database $databaseName -Query $insertQuery
+}
