@@ -341,3 +341,57 @@ foreach ($row in $csvData) {
     # 执行插入命令
     Invoke-Sqlcmd -ServerInstance $serverName -Database $databaseName -Query $insertQuery
 }
+
+
+//-----------------
+检查问题根源
+
+首先，确认读取的 CSV 数据是否在读取时被误解析为字符数组。
+测试读取数据
+
+你可以在 PowerShell 中先打印出读取的数据，看看在 $row.SingleColumn 处到底是什么：
+
+powershell
+
+# 读取没有列名的 CSV 文件并手动指定列名
+$csvData = Import-Csv -Path $inputFile -Delimiter "`t" -Header "SingleColumn"
+
+# 检查读取的数据
+foreach ($row in $csvData) {
+    Write-Host "Raw data:" $row.SingleColumn
+    Write-Host "Length of string:" ($row.SingleColumn).Length
+}
+
+确保数据正确读取
+
+假如发现读取的每个字符之间都有空格，可以通过以下方法进行处理：
+1. 使用 -Raw 参数
+
+如果你使用 Get-Content 来读取数据，而不是 Import-Csv，可以尝试使用 -Raw 参数来确保数据被读取为一个完整的字符串：
+
+powershell
+
+# 使用 Get-Content 读取文件
+$fileContent = Get-Content -Path $inputFile -Raw
+
+# 将内容分割成行
+$lines = $fileContent -split "`n"
+
+# 遍历每一行
+foreach ($line in $lines) {
+    $value = $line.Trim().Replace("'", "''")
+    $insertQuery = "INSERT INTO $tableName (ColumnName) VALUES ('$value')"
+
+    # 输出 SQL 语句用于调试
+    Write-Host $insertQuery
+
+    # 执行插入命令
+    Invoke-Sqlcmd -ServerInstance $serverName -Database $databaseName -Query $insertQuery
+}
+
+2. 直接使用 Import-Csv
+
+如果问题依旧存在，考虑使用 Get-Content 与字符串处理代替 Import-Csv。
+解决方案验证
+
+通过以上方法，你应该能够正确读取单列数据，并确保在导入数据库时没有额外的空格。请确认你的 CSV 文件本身没有包含意外的空格或格式问题。
