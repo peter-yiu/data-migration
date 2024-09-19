@@ -464,3 +464,279 @@ yaml
     发布 构建产物到 Azure DevOps Artifacts。
 
 这是最有效和推荐的方式，避免重复编译和确保发布流程顺畅。
+
+
+----------------------
+
+
+
+$(System.DefaultWorkingDirectory) 是什么路径
+ChatGPT said:
+ChatGPT
+
+$(System.DefaultWorkingDirectory) 是 Azure DevOps 中的一个内置变量，它指向当前 Agent 上用于执行任务的 工作目录。在构建或发布管道中，$(System.DefaultWorkingDirectory) 的具体路径根据任务的上下文而变化。
+在不同任务中的作用：
+
+    在构建管道（Build Pipeline）中：
+        $(System.DefaultWorkingDirectory) 指向当前构建代理的 工作目录，通常包含检出的代码和其他构建相关文件。它通常会指向类似于以下的目录：
+
+        bash
+
+    /agent/_work/1/s
+
+    其中 /agent/_work/1/s 是检出的源码目录。
+
+在发布管道（Release Pipeline）中：
+
+    $(System.DefaultWorkingDirectory) 指向存放构建产物的工作目录。在发布管道中，它用于存储从构建管道下载下来的 Artifacts。它通常会指向类似于以下的目录：
+
+    bash
+
+        /agent/_work/rN/a
+
+        其中 rN 是发布管道的运行编号，a 表示 Artifacts 的存放目录。
+
+关键点：
+
+    构建管道：$(System.DefaultWorkingDirectory) 包含从源代码管理系统（如 GitHub）检出的代码。
+    发布管道：$(System.DefaultWorkingDirectory) 包含从构建管道获取的构建产物（如 JAR 文件）。
+
+其他相关路径变量：
+
+    $(Build.ArtifactStagingDirectory)：
+        这是构建时用于临时保存产物的目录。在构建管道中，文件会被复制到这里，之后通过 PublishBuildArtifacts 发布。
+
+    $(Build.SourcesDirectory)：
+        在构建管道中，指向检出的源代码目录（通常是 $(System.DefaultWorkingDirectory)/s）。
+
+示例：在发布管道中使用 $(System.DefaultWorkingDirectory)
+
+当你在发布管道中引用构建管道的产物时，可以使用 $(System.DefaultWorkingDirectory) 来指向下载的构建产物的目录。例如：
+
+yaml
+
+steps:
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(System.DefaultWorkingDirectory)/drop'
+    Contents: '**/*.jar'
+    TargetFolder: '$(System.DefaultWorkingDirectory)/release'
+
+在这个示例中，$(System.DefaultWorkingDirectory)/drop 是从构建管道中获取的构建产物目录，$(System.DefaultWorkingDirectory)/release 是你指定的用于发布的目录。
+总结：
+
+    $(System.DefaultWorkingDirectory) 是 Azure DevOps 中用于构建和发布过程的工作目录变量。
+    它在构建和发布中指向不同的路径：构建时指向源码检出目录，发布时指向下载的构建产物目录。
+
+You said:
+$(Build.ArtifactStagingDirectory)  是什么目录  是固定的吗
+ChatGPT said:
+ChatGPT
+
+$(Build.ArtifactStagingDirectory) 是 Azure DevOps 中的一个内置变量，专门用于构建过程中存放临时产物的目录。它是 构建管道（Build Pipeline） 中的一个 临时目录，你可以将构建生成的文件（如 JAR、WAR、ZIP 文件等）复制到该目录，之后再通过 PublishBuildArtifacts 任务将这些产物发布到 Azure DevOps 的 Artifact 存储 中。
+关键特点：
+
+    用于临时存储构建产物：
+        $(Build.ArtifactStagingDirectory) 是一个构建过程中用于存放你准备发布的产物的目录。所有要发布的文件应当先复制到这个目录，然后发布任务会将它们上传为构建产物。
+
+    构建管道专用：
+        $(Build.ArtifactStagingDirectory) 仅在 构建管道 中有效，且作用是临时存放构建过程中生成的文件。
+
+    动态路径：
+        $(Build.ArtifactStagingDirectory) 的具体路径根据当前的 构建代理（Agent） 和工作空间设置动态生成，并不是固定的路径。通常会类似于以下路径：
+
+        bash
+
+        /agent/_work/1/a
+
+        其中：
+            /agent/_work/ 是代理工作目录的根目录。
+            1 是当前构建运行的工作目录编号。
+            a 代表用于存放产物的目录。
+
+工作流程：
+
+    构建过程中，你需要将生成的文件（如 JAR 文件、配置文件等）复制到 $(Build.ArtifactStagingDirectory)：
+
+    yaml
+
+steps:
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(Build.SourcesDirectory)/target'
+    Contents: '**/*.jar'
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+发布构建产物： 之后，你需要通过 PublishBuildArtifacts 任务将 $(Build.ArtifactStagingDirectory) 中的文件发布为构建产物：
+
+yaml
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'drop'
+        publishLocation: 'Container'
+
+    在发布管道中引用： 发布管道（Release Pipeline）可以从构建管道发布的构建产物中获取这些文件。
+
+总结：
+
+    $(Build.ArtifactStagingDirectory) 是一个动态生成的临时目录，用于在构建过程中存放你想要发布的构建产物。
+    路径不是固定的，它根据当前的构建代理和构建编号动态生成。
+    你必须手动将构建生成的文件复制到该目录，并通过 PublishBuildArtifacts 任务将文件发布为构建产物，供后续发布管道使用。
+
+You said:
+那么在release中如何知道在build 中的 $(Build.ArtifactStagingDirectory)？
+ChatGPT said:
+ChatGPT
+
+在 Azure DevOps Release Pipeline 中，构建流水线的 $(Build.ArtifactStagingDirectory) 只是构建阶段的临时目录，它不会直接暴露给发布管道。相反，发布流水线中不会再使用 $(Build.ArtifactStagingDirectory)，而是通过 构建产物（Artifacts） 来访问从构建流水线中发布出来的文件。
+工作流程：
+
+    构建流水线中：构建生成的文件被复制到 $(Build.ArtifactStagingDirectory)，并通过 PublishBuildArtifacts 任务发布为 构建产物。
+
+    发布流水线中：发布流水线不需要知道构建时的 $(Build.ArtifactStagingDirectory) 路径，而是通过 Artifact 直接获取构建产物（JAR 文件、配置文件等），无需手动处理临时目录。
+
+构建产物的发布与引用步骤
+1. 构建流水线中发布构建产物
+
+在构建流水线中，你将构建的文件（如 JAR 文件）复制到 $(Build.ArtifactStagingDirectory)，然后通过 PublishBuildArtifacts 发布为构建产物。
+
+yaml
+
+steps:
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(Build.SourcesDirectory)/target'   # 源目录是你的构建输出文件
+    Contents: '**/*.jar'
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'  # 将文件复制到 Artifact Staging Directory
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathToPublish: '$(Build.ArtifactStagingDirectory)' # 发布存储的文件
+    artifactName: 'drop'                               # Artifact 名称
+    publishLocation: 'Container'                       # 存储到 Azure DevOps Artifacts
+
+这一步将你的构建产物（如 JAR 文件）发布到 Azure DevOps 的 Artifacts 容器中，命名为 drop（你可以根据需要命名）。
+2. 在发布流水线中引用构建产物
+
+在发布流水线中，你不会直接引用 $(Build.ArtifactStagingDirectory)，而是通过引用构建流水线中发布的 Artifact 来访问文件。
+
+    添加构建产物（Artifact）到发布流水线：
+        在发布流水线的 Artifact 部分，点击 Add an artifact。
+        Source type 选择 Build。
+        Source (build pipeline) 选择对应的构建流水线。
+        选择发布的构建产物（如 drop）。
+
+    这样，你的发布流水线就能引用构建时发布的构建产物了。
+
+    在发布流水线中访问构建产物： 在发布流水线中，构建产物被下载到一个特定的目录，通常是 $(System.DefaultWorkingDirectory)/<artifact_name>，其中 <artifact_name> 是你在构建流水线中定义的 artifactName，如上例中的 drop。
+
+    示例：在发布管道中使用 CopyFiles 任务从构建产物目录中复制文件。
+
+    yaml
+
+    steps:
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)/drop'  # 这里是构建产物的路径
+        Contents: '**/*.jar'                                   # 选择要复制的文件
+        TargetFolder: '$(System.DefaultWorkingDirectory)/release'
+
+    在这个例子中，$(System.DefaultWorkingDirectory)/drop 是发布流水线中从构建流水线获取的构建产物目录，$(System.DefaultWorkingDirectory)/release 是你指定的用于发布的工作目录。
+
+总结
+
+    在发布流水线中，你不需要也无法直接引用构建流水线的 $(Build.ArtifactStagingDirectory)，因为它只是构建阶段的临时路径。
+    发布流水线 通过 Artifacts 获取构建产物，构建产物会被下载到发布流水线的工作目录，例如 $(System.DefaultWorkingDirectory)/<artifact_name>。
+    使用 CopyFiles@2 任务等方式从该目录中读取文件并进行部署。
+
+
+
+---------------------------------------------------
+
+
+azure devops是否可以编译部署 bc24 基于al语言的项目
+ChatGPT said:
+ChatGPT
+
+是的，Azure DevOps 可以用于编译和部署基于 AL 语言 的 BC24 (Business Central 2024) 项目。你可以使用 Azure DevOps 来构建一个 CI/CD 管道来自动化处理 AL 项目编译、测试和发布。
+
+以下是如何在 Azure DevOps 中配置编译和部署 BC24 项目的详细步骤：
+步骤 1：配置 AL 编译环境
+
+首先，你需要设置 Azure DevOps Agent 来支持编译 AL 项目。
+
+    下载并安装 AL 开发工具包：
+        在 Azure Pipelines 中，安装 AL Language Extension。
+        确保构建代理上有 Business Central Server，以及 Docker 环境支持（可以通过 Docker 部署 Business Central 容器化版本）。
+
+    使用 Docker 部署 Business Central Sandbox：
+        你可以使用 Docker 来部署 Business Central 的沙箱环境，用于测试和编译 AL 项目。使用 Microsoft 提供的 Docker 镜像，可以通过以下命令拉取和启动 BC 容器：
+
+        bash
+
+        docker pull mcr.microsoft.com/businesscentral/onprem:latest
+        docker run -e accept_eula=Y -m 4G --name bc_container -e useSSL=N mcr.microsoft.com/businesscentral/onprem
+
+步骤 2：设置 AL 项目构建 Pipeline
+
+    YAML 配置文件示例： 以下是一个用于编译 AL 项目的示例 Azure Pipelines YAML 文件：
+
+    yaml
+
+    trigger:
+      branches:
+        include:
+          - master
+    pool:
+      vmImage: 'windows-latest'
+
+    variables:
+      alBuild: '1.0.0.${{ counter(variables['Build.SourceBranchName'], 1) }}'
+
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: 'sdk'
+        version: '5.x'
+
+    - task: ALBuild@0
+      inputs:
+        artifactName: 'myArtifact'
+        workspaceDirectory: '$(Build.SourcesDirectory)'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'drop'
+
+        ALBuild@0 是你需要添加的任务，它用于编译 AL 项目，并生成 .app 文件。
+
+    关键点：
+        你需要确保 Azure Pipelines 使用的代理有能力运行 AL 编译器。可以通过 msbuild 或 navcontainerhelper 来编译。
+        将构建生成的 .app 文件发布为构建产物，这样可以在后续的发布管道中进行部署。
+
+步骤 3：配置发布流水线
+
+    添加发布阶段：
+        在 Azure DevOps 中，创建一个 Release Pipeline，并选择 Artifact 作为来源。这个 Artifact 将包含你的 AL 项目的 .app 文件。
+
+    使用 PowerShell 部署到 Business Central：
+        在发布阶段，使用 PowerShell 脚本或 Docker 来部署 .app 文件到你的 Business Central 实例。
+
+    示例 PowerShell 部署命令：
+
+    powershell
+
+    $session = New-BCContainerSession -containerName 'bc_container' -credential $credential
+    Publish-BCContainerApp -containerSession $session -appFile 'myArtifact.app' -skipVerification
+
+    配置测试和验收步骤：
+        在发布后，你可以设置自动化的测试步骤，确保部署的功能在 Business Central 中工作正常。
+
+总结：
+
+    Azure DevOps 完全支持 BC24 的 AL 项目的编译和部署。
+    你可以通过 Docker 容器 来运行 Business Central 实例，并使用 PowerShell 或其他自动化工具将 AL 项目部署到目标服务器。
+    设置 CI/CD 管道后，可以自动触发代码更改后的编译和部署，确保开发流程的高效性和自动化。
