@@ -1,0 +1,466 @@
+我有一java项目，已经有一个pipeline负责构建，我现在需要做一个发布，把构建里面的jar，部署到指定的服务器。 给出详细的步骤和示例
+ChatGPT said:
+ChatGPT
+
+要在 Azure DevOps 中创建一个发布流水线来将构建的 JAR 文件部署到指定服务器，通常需要执行以下步骤。这里假设你要通过 SSH 部署到 Linux 服务器，但也可以使用其他方式（如 FTP、SCP 等）。
+步骤一：创建发布流水线
+
+    创建发布管道：
+        登录到 Azure DevOps。
+        导航到你项目的 “Pipelines” > “Releases”。
+        点击 “New pipeline” 创建新的发布管道。
+
+    选择发布模板：
+        选择 “Empty job” 模板以从空白开始。
+
+    添加构建工件：
+        在 “Artifacts” 部分，点击 “Add an artifact”。
+        选择你已经配置好的构建管道作为来源。
+        选择合适的构建来源（构建产物），例如构建成功后生成的 jar 文件。
+
+步骤二：定义发布阶段
+
+    添加阶段：
+        在新创建的发布管道中点击 “Add stage”。
+        选择 “Empty job”。
+        给这个阶段命名，例如 “Deploy to Server”。
+
+    配置部署步骤：
+        点击刚创建的阶段，在里面添加任务。
+        点击 “+” 号，搜索 “SSH” 任务，然后选择 “SSH” 部署任务。
+        配置 SSH 连接到目标服务器。
+            SSH 服务端地址: 输入服务器的 IP 地址或域名。
+            用户名: 用于登录服务器的用户名。
+            密码或私钥: 提供 SSH 密钥或密码以进行认证。
+
+    复制 jar 文件到服务器：
+        在 SSH 部署任务中，配置以下内容：
+            Source Folder: 选择上一步构建产生的 jar 文件路径。
+            Target Folder: 指定 jar 文件在目标服务器上放置的路径。
+
+    部署 jar：
+        在 SSH 部署任务后，添加一个 SSH 任务来执行 jar 文件的启动命令。
+            Command: 配置启动命令，例如：
+
+            bash
+
+            java -jar /path/to/your.jar
+
+步骤三：配置触发器
+
+    自动触发发布：
+        点击 “Triggers”，配置在构建完成后自动触发发布。
+        勾选 “Enable continuous deployment trigger”，这样每次有新的构建产物时都会触发发布流程。
+
+示例 YAML 配置 (如果使用 YAML 发布管道)：
+
+yaml
+
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: CopyFilesOverSSH@0
+  inputs:
+    sshEndpoint: 'your_ssh_service_connection'
+    sourceFolder: '$(Build.ArtifactStagingDirectory)'
+    targetFolder: '/path/to/deployment'
+    cleanTargetFolder: false
+
+- task: CmdLine@2
+  inputs:
+    script: 'ssh user@server "java -jar /path/to/deployment/yourapp.jar"'
+
+注意事项：
+
+    SSH Service Connection：你需要在 Azure DevOps 中设置一个 SSH 服务连接，确保 Azure DevOps 可以通过 SSH 访问你的服务器。
+    文件权限：确保 jar 文件具有合适的执行权限 (chmod +x)，并且目标文件夹可写。
+
+通过这些步骤，你应该可以成功将构建生成的 jar 文件部署到指定的服务器并启动应用。
+1/2
+You said:
+我想copy build目录下面的jar和项目相关配置文件到release工作目录，然后再部署到服务器
+ChatGPT said:
+ChatGPT
+
+要实现将构建目录下的 JAR 文件和项目相关的配置文件复制到发布工作目录，然后再将其部署到服务器，你可以按照以下步骤操作。
+步骤一：更新构建流水线以输出 JAR 和配置文件
+
+在构建流水线中，你可以确保构建生成的 JAR 文件和配置文件被保存到 Artifacts 中，方便在发布管道中使用。
+
+    发布构建产物： 在构建完成后，将 JAR 文件和相关的配置文件复制到构建管道的 ArtifactStagingDirectory 目录。示例如下（假设使用 Maven 构建）：
+
+    yaml
+
+    steps:
+    - task: Maven@3
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'package'
+        options: '-DskipTests'
+
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)/target'
+        Contents: '**/*.jar'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)/src/main/resources'
+        Contents: '**/*.properties'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)/config'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'drop'
+        publishLocation: 'Container'
+
+这个任务会将生成的 JAR 文件和配置文件复制到 Build.ArtifactStagingDirectory 中，并将其发布为构建产物 drop。
+步骤二：配置发布流水线
+
+    创建发布管道：
+        同上，在 Azure DevOps 中导航到 “Pipelines” > “Releases”。
+        创建一个新的发布管道，选择 Empty job 模板。
+
+    添加构建工件：
+        点击 “Add an artifact”。
+        选择你在构建管道中发布的构建产物（artifact），比如 drop。
+
+步骤三：定义复制和部署任务
+
+    复制到发布目录：
+        在发布阶段，添加 Copy files 任务，将构建的 JAR 和配置文件从 Build.ArtifactStagingDirectory 复制到你指定的工作目录（例如 $(System.DefaultWorkingDirectory)/release）。
+
+    yaml
+
+steps:
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(System.DefaultWorkingDirectory)/drop'
+    Contents: '**/*'
+    TargetFolder: '$(System.DefaultWorkingDirectory)/release'
+
+部署到服务器：
+
+    接下来，添加 SSH 任务，将 $(System.DefaultWorkingDirectory)/release 目录下的文件复制到目标服务器，并启动部署。
+
+yaml
+
+    steps:
+    - task: CopyFilesOverSSH@0
+      inputs:
+        sshEndpoint: 'your_ssh_service_connection'
+        sourceFolder: '$(System.DefaultWorkingDirectory)/release'
+        targetFolder: '/path/to/deployment'
+        cleanTargetFolder: false
+
+    - task: CmdLine@2
+      inputs:
+        script: 'ssh user@server "java -jar /path/to/deployment/yourapp.jar"'
+
+步骤四：配置发布触发器
+
+你可以配置发布流水线在构建产物发布后自动触发，确保最新的构建产物被自动部署。
+
+    点击 “Triggers”。
+    勾选 “Enable continuous deployment trigger”。
+
+注意事项：
+
+    配置文件的位置：确保配置文件被正确复制到发布目录中，并按照你的应用需求放置在服务器上的正确路径。
+    SSH 连接：确保 SSH 连接设置正确，并且你的服务器已经授权 Azure DevOps 的 SSH 公钥或密码登录。
+    环境变量或启动参数：如果你的配置文件需要通过启动参数传递给 Java 应用程序，确保在 java -jar 启动命令中传递相应参数。例如：
+
+    bash
+
+    java -jar /path/to/deployment/yourapp.jar --spring.config.location=/path/to/deployment/config/
+
+这样，你可以顺利地将构建产物和配置文件复制到指定的发布工作目录，并通过 SSH 部署到服务器。
+You said:
+我能否从已经存在的build pipeline中直接获取jar，而不需要重新使用maven构建
+ChatGPT said:
+ChatGPT
+
+是的，你可以直接从已有的 build pipeline 中获取构建生成的 JAR 文件，而无需重新执行 Maven 构建。Azure DevOps 提供了 Artifact 来存储和共享构建输出，你可以在 release pipeline 中直接引用这些 artifacts。下面是详细步骤：
+步骤一：确保在构建流水线中发布构建产物
+
+在你的构建流水线中，你应该已经发布了构建的 JAR 文件到 Artifacts。如果还没有发布，可以按照以下步骤确保 JAR 文件被发布：
+
+    添加发布构建产物任务： 确保在你的构建流水线中，JAR 文件已经发布到 Artifact 中。例如：
+
+    yaml
+
+    steps:
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)/target'
+        Contents: '**/*.jar'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'drop'
+        publishLocation: 'Container'
+
+    上述配置将 JAR 文件发布为 drop Artifact。确保你在构建 pipeline 中执行了类似的步骤。
+
+步骤二：在发布流水线中引用已有的构建产物
+
+    创建发布管道：
+        导航到 Azure DevOps 项目的 “Pipelines” > “Releases”。
+        点击 “New pipeline” 创建发布管道。
+        选择 Empty job 模板。
+
+    添加构建产物：
+        在发布流水线中，点击 “Add an artifact”。
+        在 Source (build pipeline) 中，选择你已经配置好的构建流水线，并选择适当的 Artifact（例如 drop）。
+        选择最新的成功构建或特定的构建。
+
+    这样就可以直接从构建 pipeline 获取 JAR 文件，而无需重新构建。
+
+步骤三：复制到发布工作目录
+
+    复制 JAR 文件和配置文件到发布目录：
+        在发布流水线中，添加 Copy Files 任务，将获取的构建产物复制到发布工作目录。
+
+    示例：
+
+    yaml
+
+    steps:
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)/drop'
+        Contents: '**/*.jar'
+        TargetFolder: '$(System.DefaultWorkingDirectory)/release'
+
+    复制配置文件：
+        根据你的需求，还可以将配置文件从特定位置复制到发布工作目录（$(System.DefaultWorkingDirectory)/release）。
+
+步骤四：部署到服务器
+
+    SSH 复制到服务器：
+        同前面的步骤，在发布管道中添加 SSH 任务，将文件从发布目录复制到服务器上。
+
+    执行部署命令：
+        在服务器上通过 SSH 执行命令来启动 JAR 文件。
+
+    yaml
+
+    steps:
+    - task: CmdLine@2
+      inputs:
+        script: 'ssh user@server "java -jar /path/to/deployment/yourapp.jar"'
+
+完整流程概述：
+
+    构建管道：构建 JAR 文件并发布到 Artifact。
+    发布管道：
+        引用构建管道的 Artifact。
+        复制 JAR 文件和配置文件到发布工作目录。
+        通过 SSH 将文件复制到服务器并启动应用。
+
+通过这种方式，你不需要重新构建，而是直接从已有的构建产物中获取 JAR 文件进行发布和部署。
+You said:
+build的pipeline是需要从github checkout代码下来然后在编译 打包的。  我在release中如何和获取这些产物
+ChatGPT said:
+ChatGPT
+
+在 Azure DevOps Release Pipeline 中，你可以直接获取 Build Pipeline 中生成的构建产物（如 JAR 文件和配置文件），而不需要再次从 GitHub 上拉取代码并重新构建。这是通过 构建产物 (Artifacts) 来实现的，它保存了构建流水线中的输出，并允许在发布流水线中复用这些构建结果。
+
+以下是详细的操作步骤，确保你可以在发布管道中直接获取 Build Pipeline 的产物：
+步骤一：构建流水线发布构建产物
+
+在你的 Build Pipeline 中，确保已经将构建产物（JAR 文件、配置文件等）保存到 Azure DevOps 的 Artifact 存储中：
+
+    编译、打包并发布 JAR： 在构建流水线的最后一步，确保添加了将构建产物（如 JAR 文件、配置文件）发布到 Artifact 的步骤：
+
+    yaml
+
+    steps:
+    - checkout: self  # 从 GitHub 或其他来源检出代码
+
+    # Maven 打包步骤 (示例)
+    - task: Maven@3
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'package'
+        options: '-DskipTests'
+
+    # 将 JAR 文件复制到 Artifact Staging Directory
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)/target'
+        Contents: '**/*.jar'
+        TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+    # 发布构建产物到 Azure DevOps Artifacts
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'  # 包含 JAR 文件和配置文件的目录
+        artifactName: 'drop'  # 你可以为产物自定义名称
+        publishLocation: 'Container'
+
+    上述步骤确保了构建生成的 JAR 文件和其他产物发布到 Artifacts，你可以在后续的发布管道中使用这些构建产物。
+
+步骤二：在发布流水线中引用构建产物
+
+在发布流水线中，你不需要再次检出代码，也不需要重新构建，而是可以直接从构建管道的 Artifacts 中获取产物。
+
+    创建发布管道：
+        在 Azure DevOps 项目中，导航到 Pipelines > Releases。
+        点击 New pipeline 创建新的发布流水线。
+        选择 Empty job 模板，从空白开始创建。
+
+    添加构建产物（Artifact）：
+        点击 “Add an artifact” 按钮，将之前的构建产物添加到发布管道中。
+        在 Source type 中选择 Build，在 Source (build pipeline) 中选择已经存在的构建管道。
+        在 Default version 中，可以选择最新的成功构建或特定的版本号。
+
+    这样，发布流水线就会引用构建流水线的产物，不需要重新检出代码或执行构建。
+
+步骤三：复制构建产物到发布目录
+
+现在，你已经将构建产物添加到发布流水线中，你可以在发布阶段中将这些产物复制到特定的发布工作目录。
+
+    添加任务来复制产物：
+        点击发布阶段（例如 "Stage 1"），并添加一个 Copy Files 任务。
+        将从构建流水线获取的产物复制到发布工作目录（如 $(System.DefaultWorkingDirectory)/release）。
+
+    示例 YAML：
+
+    yaml
+
+    steps:
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)/drop'
+        Contents: '**/*.jar'
+        TargetFolder: '$(System.DefaultWorkingDirectory)/release'
+
+    配置文件处理： 如果你在构建时没有包含配置文件，也可以在发布阶段将其从其他来源复制到发布目录。
+
+步骤四：通过 SSH 部署到服务器
+
+你可以添加一个 SSH 任务将产物部署到目标服务器：
+
+    复制到服务器： 添加 Copy Files Over SSH 任务，将发布目录中的 JAR 文件和配置文件复制到远程服务器。
+
+    yaml
+
+steps:
+- task: CopyFilesOverSSH@0
+  inputs:
+    sshEndpoint: 'your_ssh_service_connection'
+    sourceFolder: '$(System.DefaultWorkingDirectory)/release'
+    targetFolder: '/path/to/deployment'
+    cleanTargetFolder: false
+
+启动应用程序： 添加一个 SSH 命令任务来在服务器上执行 JAR 文件。
+
+yaml
+
+    steps:
+    - task: CmdLine@2
+      inputs:
+        script: 'ssh user@server "java -jar /path/to/deployment/yourapp.jar"'
+
+总结
+
+    Build Pipeline：
+        执行 GitHub 上的代码检出、编译和打包，生成 JAR 文件并将其发布到 Azure DevOps 的 Artifacts。
+    Release Pipeline：
+        从 Build Pipeline 的 Artifact 获取构建产物，无需重新检出代码或重新构建。
+        将构建产物复制到发布工作目录，并通过 SSH 部署到服务器。
+
+通过这个流程，你可以复用构建流水线的成果，避免重复编译和打包。
+You said:
+如果 JAR 文件没有 复制到 Artifact Staging Directory和没有发布构建产物到 Azure DevOps Artifacts  能否在release中获取
+ChatGPT said:
+ChatGPT
+
+如果没有将 JAR 文件复制到 Artifact Staging Directory 并且没有发布构建产物到 Azure DevOps Artifacts，那么发布管道无法直接获取构建产物。在 Azure DevOps 中，发布管道（Release Pipeline） 依赖于构建产物（Artifacts），这些产物必须在构建流水线中明确发布出来才能在发布流水线中使用。
+
+因此，如果你的构建流水线没有发布构建产物，Azure DevOps 的发布管道将无法自动获取到 JAR 文件或其他构建产物。你需要确保构建产物被正确地保存和发布。
+解决方案
+
+要在 Release Pipeline 中获取构建生成的 JAR 文件，你需要在构建流水线中添加几个关键步骤：
+
+    复制 JAR 文件到 Artifact Staging Directory。
+    发布构建产物到 Azure DevOps Artifacts。
+
+1. 复制 JAR 文件到 Artifact Staging Directory
+
+这是将构建生成的 JAR 文件保存到一个中间目录 (ArtifactStagingDirectory) 的步骤：
+
+yaml
+
+steps:
+- task: CopyFiles@2
+  inputs:
+    SourceFolder: '$(System.DefaultWorkingDirectory)/target'
+    Contents: '**/*.jar'
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+    SourceFolder: 通常为你的构建输出目录，比如 $(System.DefaultWorkingDirectory)/target。
+    TargetFolder: 需要设置为 $(Build.ArtifactStagingDirectory)，Azure DevOps 会使用这个目录来临时存放构建产物。
+
+2. 发布构建产物到 Azure DevOps Artifacts
+
+在将 JAR 文件复制到 ArtifactStagingDirectory 后，你需要通过 PublishBuildArtifacts 任务发布它们，供后续的发布管道使用：
+
+yaml
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    pathToPublish: '$(Build.ArtifactStagingDirectory)'
+    artifactName: 'drop'
+    publishLocation: 'Container'
+
+    pathToPublish: 指向 $(Build.ArtifactStagingDirectory)，即你之前复制了 JAR 文件的目录。
+    artifactName: 可以自定义的构建产物名称，比如 drop。
+    publishLocation: 通常设置为 'Container'，表示将构建产物存储在 Azure DevOps 的 Artifacts 容器中。
+
+发布流水线使用构建产物
+
+一旦你在构建流水线中正确发布了构建产物，你可以在发布流水线中使用它们：
+
+    在发布管道中添加构建产物：
+        在发布管道中，点击 Add an artifact。
+        选择构建管道作为 Source，并选择发布的构建产物（如 drop）。
+
+    从 Artifact 中复制文件： 在发布管道中，通过 CopyFiles@2 任务将构建产物（JAR 文件等）从构建流水线获取到发布流水线的工作目录：
+
+    yaml
+
+    steps:
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(System.DefaultWorkingDirectory)/drop'
+        Contents: '**/*.jar'
+        TargetFolder: '$(System.DefaultWorkingDirectory)/release'
+
+如果没有发布构建产物的替代方案
+
+如果你不想在构建流水线中发布构建产物，理论上你可以通过其他方式在发布流水线中获取文件，但这些方法并不是 Azure DevOps 的推荐做法：
+
+    直接从 GitHub 获取代码并构建： 你可以在发布流水线中添加步骤，通过 git clone 命令从 GitHub 检出代码，并手动编译和打包 JAR 文件。这种方法会重复构建操作，效率低下，不推荐使用。
+
+    外部存储构建产物： 你可以在构建流水线中将 JAR 文件上传到外部存储（如 Azure Blob Storage、AWS S3 等），然后在发布流水线中通过下载步骤获取这些文件。但这仍然需要构建流水线存储构建产物。
+
+    使用共享文件系统： 如果构建产物被存储在一个共享的文件系统上（如网络文件共享），发布流水线可以直接从该共享路径读取文件，但这种做法要求你有独立的文件存储基础设施。
+
+总结
+
+为了在发布流水线中获取构建产物，建议你按照标准流程，在构建流水线中：
+
+    复制 产物到 Artifact Staging Directory。
+    发布 构建产物到 Azure DevOps Artifacts。
+
+这是最有效和推荐的方式，避免重复编译和确保发布流程顺畅。
