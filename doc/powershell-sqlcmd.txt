@@ -220,3 +220,82 @@ cmd
     你可以通过 ODBC 数据源管理器、命令行、注册表等方式检查已安装的 ODBC 驱动版本。如果版本不够高，可以从微软官网下载并安装最新的 ODBC 驱动程序。
 
 
+
+
+    //---------------------------
+
+
+    如果你希望在调用 sqlcmd 命令时明确指定使用的 ODBC 驱动程序版本（如 ODBC Driver 17 或 18），则需要通过连接字符串指定驱动程序。虽然 sqlcmd 命令本身不允许直接设置 ODBC 驱动版本，但你可以通过设置数据源名称（DSN）来控制使用的 ODBC 驱动版本。
+    步骤 1：创建 DSN（数据源名称）
+
+    要指定 sqlcmd 使用特定的 ODBC 驱动程序版本，可以先配置一个 DSN（数据源名称）来指定所需的 ODBC 驱动。
+
+        打开 ODBC 数据源管理器：
+            按 Windows + R，输入 odbcad32，然后按回车。
+            选择 “系统 DSN” 或 “用户 DSN”，点击 “添加”。
+
+        选择 ODBC 驱动版本：
+            在弹出的驱动程序列表中，选择 “ODBC Driver 17 for SQL Server” 或 “ODBC Driver 18 for SQL Server”，然后点击 下一步。
+
+        设置 DSN 名称和服务器信息：
+            为 DSN 选择一个名称，例如：MyDSN_ODBC17（或 MyDSN_ODBC18）。
+            输入 服务器地址，并完成数据源的配置。
+
+    步骤 2：使用 DSN 在 sqlcmd 中指定 ODBC 驱动版本
+
+    一旦 DSN 配置完成，你可以在 sqlcmd 命令中使用该 DSN 来确保使用特定版本的 ODBC 驱动。
+    示例：通过 sqlcmd 使用 DSN 连接到 SQL Server
+
+    powershell
+
+    # 使用 PowerShell 调用 sqlcmd，并通过 DSN 来指定 ODBC 驱动
+    $dsnName = "MyDSN_ODBC17"  # 使用你配置的 DSN 名称
+    $SqlFilePath = "C:\path\to\your\script.sql"   # SQL 文件路径
+    $LogFilePath = "C:\path\to\log\sqlcmd_log.txt"  # 日志文件路径
+
+    # 调用 sqlcmd，使用 DSN 来指定 ODBC 驱动
+    $sqlcmdCommand = @"
+    sqlcmd -D $dsnName -i `"$SqlFilePath`" -o `"$LogFilePath`"
+    "@
+
+    # 运行 sqlcmd 命令
+    Invoke-Expression $sqlcmdCommand
+
+    # 输出完成信息
+    Write-Host "SQL script executed using sqlcmd with DSN: $dsnName. Full log saved to: $LogFilePath"
+
+    示例：直接指定数据库名和服务器地址
+
+    如果不想通过 DSN，可以直接使用连接字符串，但这时不能明确指定 ODBC 驱动版本。通常，sqlcmd 会使用系统中安装的最新版本 ODBC 驱动。
+
+    powershell
+
+    # 设置 SQL Server 实例信息
+    $serverInstance = "your_sql_server.database.windows.net"
+    $databaseName = "your_database"
+    $SqlFilePath = "C:\path\to\your\script.sql"   # SQL 文件路径
+    $LogFilePath = "C:\path\to\log\sqlcmd_log.txt"  # 日志文件路径
+
+    # 调用 sqlcmd 并直接指定服务器和数据库信息
+    $sqlcmdCommand = @"
+    sqlcmd -S $serverInstance -d $databaseName -i `"$SqlFilePath`" -o `"$LogFilePath`"
+    "@
+
+    # 运行 sqlcmd 命令
+    Invoke-Expression $sqlcmdCommand
+
+    # 输出完成信息
+    Write-Host "SQL script executed using sqlcmd. Full log saved to: $LogFilePath"
+
+    说明：
+
+        DSN：通过 DSN 来指定 ODBC 驱动版本，可以确保 sqlcmd 使用指定版本的驱动程序（如 ODBC Driver 17 for SQL Server 或 ODBC Driver 18 for SQL Server）。
+        日志输出：-o 参数将日志输出到指定文件中，便于查看执行结果。
+        SQL 文件执行：通过 -i 参数指定 SQL 脚本文件路径，sqlcmd 将执行该文件中的 SQL 语句。
+
+    结论：
+
+        使用 DSN 是确保 sqlcmd 使用特定版本的 ODBC 驱动程序的最佳方式。你可以在 ODBC 数据源管理器中配置 DSN，并在 sqlcmd 调用中使用 -D 参数指定该 DSN 名称。
+        如果你没有设置 DSN，sqlcmd 通常会自动使用最新的 ODBC 驱动程序版本。
+
+
