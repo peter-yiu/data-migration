@@ -299,3 +299,5 @@ cmd
         如果你没有设置 DSN，sqlcmd 通常会自动使用最新的 ODBC 驱动程序版本。
 
 
+# 设置 SQLCMDACCESSTOKEN 环境变量
+[System.Environment]::SetEnvironmentVariable('SQLCMDACCESSTOKEN', $accessToken, 'Process')
