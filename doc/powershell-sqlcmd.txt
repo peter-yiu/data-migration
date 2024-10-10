@@ -301,3 +301,23 @@ cmd
 
 # 设置 SQLCMDACCESSTOKEN 环境变量
 [System.Environment]::SetEnvironmentVariable('SQLCMDACCESSTOKEN', $accessToken, 'Process')
+
+
+
+
+@echo off
+echo Please enter your password:
+set /p password=Password:
+
+REM 检查用户是否输入了密码
+if "%password%"=="" (
+    echo No password entered. Exiting...
+    exit /b
+)
+
+echo Password entered. Continuing the script...
+REM 这里可以加入你的其他逻辑
+echo Running the rest of the script...
+
+REM 结束脚本
+pause
