@@ -321,3 +321,169 @@ echo Running the rest of the script...
 
 REM 结束脚本
 pause
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+在 PowerShell 中，可以通过 Azure PowerShell 模块 来访问和获取 Azure Key Vault 中保存的机密（Secrets）。这里是一个简洁的指南，介绍如何使用 PowerShell 获取 Azure Key Vault 中保存的信息。
+先决条件：
+
+    安装 Azure PowerShell 模块（如果尚未安装）。
+    登录到 Azure。
+    具有对 Key Vault 的访问权限。
+
+步骤 1：安装 Azure PowerShell 模块（如果尚未安装）
+
+如果你还没有安装 Azure PowerShell 模块，可以通过以下命令来安装：
+
+powershell
+
+Install-Module -Name Az -AllowClobber -Force
+
+步骤 2：登录 Azure
+
+在运行脚本之前，使用以下命令登录到 Azure：
+
+powershell
+
+Connect-AzAccount
+
+这将打开一个浏览器窗口，提示你登录 Azure 账户。
+步骤 3：获取 Key Vault 中保存的机密信息
+
+要从 Azure Key Vault 中获取机密，使用 Get-AzKeyVaultSecret cmdlet。
+示例代码：获取 Key Vault 中的一个机密（Secret）
+
+powershell
+
+# 定义 Key Vault 名称和机密名称
+$vaultName = "your-keyvault-name"  # 替换为你的 Key Vault 名称
+$secretName = "your-secret-name"   # 替换为你要获取的机密名称
+
+# 获取机密的值
+$secret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+
+# 显示机密值（解码为明文）
+$secretValue = $secret.SecretValueText
+Write-Host "The secret value is: $secretValue"
+
+说明：
+
+    Get-AzKeyVaultSecret：该 cmdlet 从指定的 Key Vault 中获取机密。
+        -VaultName：指定 Key Vault 的名称。
+        -Name：指定机密的名称。
+    $secret.SecretValueText：将机密的安全字符串解码为明文，并存储在 $secretValue 中。
+
+获取多个机密
+
+如果你想获取某个 Key Vault 中所有机密，可以使用以下代码：
+
+powershell
+
+# 获取 Key Vault 中的所有机密
+$secrets = Get-AzKeyVaultSecret -VaultName $vaultName
+
+# 遍历所有机密并显示它们的值
+foreach ($secret in $secrets) {
+    $secretValue = $secret.SecretValueText
+    Write-Host "Secret Name: $($secret.Name), Secret Value: $secretValue"
+}
+
+重要提示：
+
+    访问控制 (IAM)：确保你拥有访问 Key Vault 的权限，通常需要分配 Key Vault Secrets User 或 Key Vault Secrets Officer 角色。
+
+    安全性：机密（Secrets）通常是敏感数据，请确保不要将其明文显示或存储在不安全的位置。
+
+总结：
+
+    通过 Get-AzKeyVaultSecret cmdlet，你可以轻松地在 PowerShell 中获取 Azure Key Vault 中保存的机密。
+    确保你的账号有访问权限，并始终安全处理机密信息。
+
+You said:
+如何在key vault添加这个密码
+ChatGPT said:
+ChatGPT
+
+要在 Azure Key Vault 中添加一个新的机密（例如密码），你可以使用 Azure PowerShell 或 Azure 门户进行操作。下面介绍如何使用 PowerShell 来添加机密。
+步骤 1：安装 Azure PowerShell 模块（如未安装）
+
+如果还没有安装 Azure PowerShell 模块，请运行以下命令进行安装：
+
+powershell
+
+Install-Module -Name Az -AllowClobber -Force
+
+步骤 2：登录 Azure
+
+在运行 PowerShell 脚本之前，先登录 Azure：
+
+powershell
+
+Connect-AzAccount
+
+这将会打开一个浏览器窗口，你需要在其中登录到你的 Azure 帐户。
+步骤 3：向 Key Vault 添加机密
+
+使用 Set-AzKeyVaultSecret cmdlet 向 Key Vault 中添加一个机密。
+示例代码：向 Key Vault 添加一个新的密码
+
+powershell
+
+# 定义 Key Vault 名称和要添加的机密名称及值
+$vaultName = "your-keyvault-name"  # 替换为你的 Key Vault 名称
+$secretName = "your-secret-name"   # 替换为你要存储的机密名称（如 "MySQLPassword"）
+$secretValue = ConvertTo-SecureString "your-secret-value" -AsPlainText -Force  # 替换为你的密码或其他机密值
+
+# 添加机密到 Key Vault
+Set-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -SecretValue $secretValue
+
+Write-Host "Secret $secretName added to Key Vault $vaultName"
+
+说明：
+
+    Set-AzKeyVaultSecret：该 cmdlet 用于在 Key Vault 中创建或更新一个机密。
+        -VaultName：Key Vault 的名称。
+        -Name：机密的名称（例如你想存储的密码可以命名为 DatabasePassword）。
+        -SecretValue：机密的值，必须是 SecureString 类型。上面的示例中使用 ConvertTo-SecureString 将明文密码转换为安全字符串。
+
+验证机密是否添加成功
+
+你可以使用 Get-AzKeyVaultSecret 来验证机密是否成功添加到 Key Vault：
+
+powershell
+
+$secret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+Write-Host "The secret $secretName has been added with value: $($secret.SecretValueText)"
+
+在 Azure 门户中手动添加机密
+
+如果你想通过 Azure 门户 来手动添加机密，可以按照以下步骤操作：
+
+    登录到 Azure 门户。
+    在左侧导航栏中，选择 Key Vaults，然后选择你要添加机密的 Key Vault。
+    在 Key Vault 的页面中，选择 Secrets。
+    点击 + Generate/Import 按钮。
+    在 Name 中输入机密名称（如 DatabasePassword）。
+    在 Value 中输入你的机密值（如密码）。
+    点击 Create，机密将被添加到 Key Vault 中。
+
+总结
+
+    你可以使用 PowerShell 中的 Set-AzKeyVaultSecret 来向 Key Vault 中添加密码或其他机密。
+    机密的值必须是安全字符串，可以使用 ConvertTo-SecureString 将明文值转换为安全字符串。
+    也可以通过 Azure 门户手动添加机密。
