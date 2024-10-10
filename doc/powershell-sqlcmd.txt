@@ -1,0 +1,41 @@
+# 定义 SQL 文件路径和数据库连接参数
+$SqlFilePath = "C:\path\to\your\script.sql"   # SQL 文件路径
+$ServerInstance = "your_sql_server.database.windows.net"  # Azure SQL Server 实例名
+$DatabaseName = "your_database"               # 默认数据库
+$LogFilePath = "C:\path\to\log\sqlcmd_log.txt"  # 日志文件路径
+
+# 获取 Access Token
+$accessToken = (Get-AzAccessToken -ResourceUrl https://database.windows.net/).Token
+
+# 调用 sqlcmd，使用 Access Token
+$sqlcmdCommand = "sqlcmd -S tcp:$ServerInstance -d $DatabaseName -G -I -Q `"SELECT 1`" -v AccessToken=$accessToken -o `"$LogFilePath`""
+
+# 运行 sqlcmd
+Invoke-Expression $sqlcmdCommand
+
+# 输出完成信息
+Write-Host "SQL script executed using sqlcmd with Access Token. Full log saved to: $LogFilePath"
+
+
+
+
+
+
+
+
+# 定义 Azure SQL 数据库的连接参数
+$ServerInstance = "your_sql_server.database.windows.net"  # Azure SQL Server 实例名
+$DatabaseName = "your_database"                           # 数据库名称
+$SqlQuery = "SELECT 1"                                    # 要执行的 SQL 查询
+$LogFilePath = "C:\path\to\log\sqlcmd_log.txt"            # 日志文件路径
+
+# 构建 sqlcmd 调用，传递 Access Token
+$sqlcmdCommand = @"
+sqlcmd -S $ServerInstance -d $DatabaseName -G -I -v AccessToken=$accessToken -Q "$SqlQuery" -o "$LogFilePath"
+"@
+
+# 运行 sqlcmd 命令
+Invoke-Expression $sqlcmdCommand
+
+# 输出完成信息
+Write-Host "SQL query executed using sqlcmd with Access Token. Full log saved to: $LogFilePath"
