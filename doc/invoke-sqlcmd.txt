@@ -104,3 +104,82 @@ catch {
 总结：
 
 要确保 PowerShell 返回正确的退出码给 BAT 脚本，建议使用 powershell.exe -Command 方式执行 PowerShell 脚本，并在 PowerShell 中使用 exit $LASTEXITCODE。这种方式可以确保 PowerShell 的退出码传递到 BAT 脚本，从而让 %ERRORLEVEL% 正确反映 PowerShell 脚本的执行结果。
+
+
+
+
+
+
+如果你在 BAT 脚本 中调用 PowerShell 脚本，传递了参数并使用了 exit $LASTEXITCODE，但仍然发现 %ERRORLEVEL% 始终为 0，可能是因为 powershell.exe 在某些情况下无法正确传递退出码。为了确保退出码正确传递，你可以使用以下改进方法来捕获 PowerShell 脚本中的错误并确保在 BAT 脚本中能够正确获取。
+解决方法：
+
+    使用 $global:LASTEXITCODE 代替 $LASTEXITCODE：有时在使用 exit 退出时，PowerShell 可能不会正确传递 $LASTEXITCODE。你可以尝试使用 $global:LASTEXITCODE。
+    确保 PowerShell 退出码传递：使用 exit 来显式退出并传递返回值。
+
+更新的解决方案：
+1. PowerShell 脚本（your-script.ps1）
+
+确保在发生异常时，PowerShell 脚本会设置全局退出码并正确退出：
+
+powershell
+
+param (
+    [string]$param1,
+    [string]$param2
+)
+
+try {
+    Write-Host "Received parameters: $param1 and $param2"
+
+    # 模拟 SQL 执行的逻辑
+    $sqlcmdCommand = "sqlcmd -S $param1 -d $param2 -i C:\path\to\your-sql-file.sql -b"
+    $output = & cmd /c $sqlcmdCommand 2>&1
+
+    if ($global:LASTEXITCODE -ne 0) {
+        Write-Host "SQL execution failed with error(s):"
+        $output | ForEach-Object { Write-Host $_ }
+        throw "SQLCMD execution failed with exit code $global:LASTEXITCODE"
+    } else {
+        Write-Host "SQL execution succeeded."
+        $output | ForEach-Object { Write-Host $_ }
+    }
+
+    # 正常退出，返回成功
+    exit 0
+}
+catch {
+    Write-Host "An error occurred: $_"
+    exit 1  # 返回非零退出码表示失败
+}
+
+2. BAT 脚本（your-batch-script.bat）
+
+确保通过 -Command 调用 PowerShell，并捕获正确的退出码：
+
+bat
+
+@echo off
+setlocal
+
+REM 定义参数
+set serverName=your-server-name
+set databaseName=your-database-name
+
+REM 执行循环
+for /l %%i in (1,1,3) do (
+    echo Executing PowerShell script with parameters: %serverName% and %databaseName%, iteration %%i...
+
+    REM 调用 PowerShell 脚本并传递参数，同时捕获退出码
+    powershell.exe -ExecutionPolicy Bypass -Command "& {C:\path\to\your-script.ps1 -param1 '%serverName%' -param2 '%databaseName%'; exit $global:LASTEXITCODE}"
+
+    REM 检查 PowerShell 的退出码
+    if %ERRORLEVEL% neq 0 (
+        echo PowerShell script failed with ERRORLEVEL %ERRORLEVEL%. Exiting loop...
+        exit /b 1  REM 终止批处理脚本并返回非零退出码
+    )
+
+    echo PowerShell script succeeded with ERRORLEVEL %ERRORLEVEL%, continuing...
+)
+
+echo All iterations completed successfully.
+exit /b 0
