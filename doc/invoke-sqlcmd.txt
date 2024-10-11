@@ -1,0 +1,31 @@
+try {
+    # SQL Server 连接信息
+    $serverName = "your-server-name"
+    $databaseName = "your-database-name"
+    $sqlFilePath = "C:\path\to\myScript.sql"
+
+    # 执行 sqlcmd 命令
+    $sqlcmdCommand = "sqlcmd -S $serverName -d $databaseName -i $sqlFilePath"
+    $output = & cmd /c $sqlcmdCommand 2>&1
+
+    # 检查 sqlcmd 的退出状态
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "SQL script execution failed with the following error(s):"
+        $output | ForEach-Object { Write-Host $_ }
+        throw "SQLCMD execution failed with exit code $LASTEXITCODE"
+    } else {
+        Write-Host "SQL script execution succeeded."
+        $output | ForEach-Object { Write-Host $_ }
+    }
+} catch {
+    Write-Host "An error occurred while executing the SQL script:"
+    Write-Host $_.Exception.Message
+}
+
+总结
+
+    使用 Try...Catch 块可以捕获 sqlcmd 执行中的异常。
+    使用 $LASTEXITCODE 来判断 sqlcmd 的退出状态码，0 表示成功，非 0 表示失败。
+    捕获输出和错误流通过 2>&1 重定向到标准输出，并将输出保存在变量中以便后续处理。
+
+这样可以确保 SQL 执行时发生的任何错误都能够被 PowerShell 捕获和处理。
