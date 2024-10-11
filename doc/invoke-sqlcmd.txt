@@ -183,3 +183,40 @@ for /l %%i in (1,1,3) do (
 
 echo All iterations completed successfully.
 exit /b 0
+
+
+
+
+# 定义文件夹路径和数据库信息
+$folderPath = "C:\path\to\sql\files"  # 替换为你的 SQL 文件夹路径
+$serverName = "your-server-name"
+$databaseName = "your-database-name"
+$credential = "your-credential"  # 如果需要，填入你的认证信息
+$logFile = "C:\path\to\output\log.txt"  # 日志文件路径
+
+# 查找所有 .sql 文件
+$sqlFiles = Get-ChildItem -Path $folderPath -Filter *.sql
+
+# 遍历每个 .sql 文件并使用 sqlcmd 执行
+foreach ($file in $sqlFiles) {
+    Write-Host "Running SQL file: $($file.FullName)"
+
+    # 构建 sqlcmd 命令
+    $sqlcmdCommand = "sqlcmd -S $serverName -d $databaseName -i `"$($file.FullName)`" -b -o $logFile"
+
+    try {
+        # 执行 sqlcmd 并捕获输出和错误
+        & cmd /c $sqlcmdCommand
+
+        # 检查退出码
+        if ($global:LASTEXITCODE -ne 0) {
+            Write-Host "Execution failed for: $($file.FullName) with exit code $global:LASTEXITCODE" -ForegroundColor Red
+            throw "SQL file failed: $($file.FullName)"
+        } else {
+            Write-Host "Execution succeeded for: $($file.FullName)" -ForegroundColor Green
+        }
+    }
+    catch {
+        Write-Host "Error: $_" -ForegroundColor Red
+    }
+}
