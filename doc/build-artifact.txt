@@ -1,0 +1,455 @@
+在 PowerShell 中，可以使用 YamlDotNet 库来读取 YAML 文件的内容。YamlDotNet 是一个处理 YAML 格式文件的开源库，PowerShell 本身不直接支持 YAML 解析，但可以通过安装该库并使用其方法来读取 YAML 文件。
+方法 1：使用 YamlDotNet 库读取 YAML 文件
+
+    安装 YamlDotNet 库
+        你可以通过 NuGet 或直接下载 DLL 文件来安装 YamlDotNet，也可以通过 PowerShell 下载。
+
+    powershell
+
+# 下载 YamlDotNet 库
+Install-Package -Name YamlDotNet -Source https://www.nuget.org/api/v2 -Scope CurrentUser
+
+加载 DLL 并解析 YAML 文件
+
+假设你有以下 config.yml 文件内容：
+
+yaml
+
+database:
+  server: "localhost"
+  port: 3306
+  username: "admin"
+  password: "password123"
+
+使用代码读取 YAML 文件
+
+powershell
+
+    # 加载 YamlDotNet DLL
+    Add-Type -Path "path\to\YamlDotNet.dll"
+
+    # 读取 YAML 文件内容
+    $yamlFilePath = "path\to\config.yml"
+    $yamlContent = Get-Content -Path $yamlFilePath -Raw
+
+    # 创建 YamlDotNet 对象并解析
+    $deserializer = New-Object YamlDotNet.Serialization.Deserializer
+    $data = $deserializer.Deserialize([Hashtable], $yamlContent)
+
+    # 访问 YAML 参数
+    Write-Host "Server: $($data['database']['server'])"
+    Write-Host "Port: $($data['database']['port'])"
+    Write-Host "Username: $($data['database']['username'])"
+
+方法 2：使用 ConvertFrom-Yaml 在 PowerShell 7 中读取 YAML 文件
+
+PowerShell 7 引入了 ConvertFrom-Yaml 和 ConvertTo-Yaml 命令，这使得 YAML 解析更加简单。如果你使用的是 PowerShell 7 或更高版本，直接可以用以下方式读取 YAML 文件。
+
+    读取 YAML 文件
+
+    powershell
+
+    # 读取 YAML 文件
+    $yamlFilePath = "path\to\config.yml"
+    $yamlContent = Get-Content -Path $yamlFilePath -Raw | ConvertFrom-Yaml
+
+    # 访问 YAML 参数
+    Write-Host "Server: $($yamlContent.database.server)"
+    Write-Host "Port: $($yamlContent.database.port)"
+    Write-Host "Username: $($yamlContent.database.username)"
+
+方法 3：使用简单正则表达式读取 YAML 文件（适用于小文件）
+
+对于简单的 YAML 文件，如果不想使用外部库，可以使用 PowerShell 的正则表达式和字符串操作读取数据，但这种方式适合非常简单的 YAML 文件，不适合复杂嵌套的结构。
+
+powershell
+
+$yamlFilePath = "path\to\config.yml"
+$yamlContent = Get-Content -Path $yamlFilePath
+
+# 手动解析
+$database = @{
+    server = ($yamlContent -match 'server:\s*(.*)' | Out-Null; $matches[1])
+    port = ($yamlContent -match 'port:\s*(\d+)' | Out-Null; $matches[1])
+    username = ($yamlContent -match 'username:\s*(.*)' | Out-Null; $matches[1])
+    password = ($yamlContent -match 'password:\s*(.*)' | Out-Null; $matches[1])
+}
+
+# 访问 YAML 参数
+Write-Host "Server: $($database.server)"
+Write-Host "Port: $($database.port)"
+Write-Host "Username: $($database.username)"
+
+总结
+
+    方法 1 适用于任何版本的 PowerShell，但需要安装 YamlDotNet 库。
+    方法 2 适用于 PowerShell 7 及更高版本，推荐在此环境下使用 ConvertFrom-Yaml。
+    方法 3 适用于简单文件，但解析复杂 YAML 文件时不太可靠。
+
+
+//-------------------------------------------------
+
+在 PowerShell 中，实现类似于 Apache Ant 中的 fileset 复制功能（即使用通配符或模式匹配来选择文件）可以通过 Get-ChildItem 结合 Copy-Item 来完成。PowerShell 的通配符支持大部分的文件选择功能，类似于 Ant 风格的文件模式匹配。
+示例：实现 Ant 风格的文件复制
+
+假设你有以下目录结构，并希望将特定文件从 src 文件夹复制到 dest 文件夹：
+
+c
+
+project
+├── src
+│   ├── folder1
+│   │   ├── file1.txt
+│   │   ├── file2.log
+│   ├── folder2
+│   │   ├── file3.txt
+│   │   ├── file4.log
+└── dest
+
+你可以通过 Get-ChildItem 和 Copy-Item 结合通配符来实现。
+使用通配符复制文件
+
+powershell
+
+$sourcePath = "C:\project\src"    # 源目录
+$destinationPath = "C:\project\dest"  # 目标目录
+$filePattern = "*.txt"             # 文件模式（如 *.txt 或 *.log）
+
+# 查找并复制符合模式的文件
+Get-ChildItem -Path $sourcePath -Recurse -Filter $filePattern | ForEach-Object {
+    $relativePath = $_.FullName.Substring($sourcePath.Length + 1) # 计算相对路径
+    $destFilePath = Join-Path -Path $destinationPath -ChildPath $relativePath
+
+    # 创建目标文件夹（如果不存在）
+    $destDir = Split-Path -Path $destFilePath
+    if (!(Test-Path -Path $destDir)) {
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+    }
+
+    # 复制文件
+    Copy-Item -Path $_.FullName -Destination $destFilePath -Force
+    Write-Host "Copied $($_.FullName) to $destFilePath"
+}
+
+解释
+
+    Get-ChildItem -Recurse -Filter：使用 -Recurse 参数递归地搜索文件夹下所有符合条件的文件。-Filter 参数指定文件模式（例如 *.txt）。
+    计算相对路径：通过去掉源目录路径部分，计算出每个文件的相对路径。
+    创建目标目录：如果目标目录路径不存在，使用 New-Item -ItemType Directory 创建。
+    复制文件：使用 Copy-Item 将文件复制到目标路径。
+
+支持多种模式
+
+如果你想复制多种文件类型，可以将 $filePattern 替换为数组，并使用 ForEach 进行遍历。
+
+powershell
+
+$filePatterns = @("*.txt", "*.log")  # 支持多个文件模式
+
+foreach ($pattern in $filePatterns) {
+    Get-ChildItem -Path $sourcePath -Recurse -Filter $pattern | ForEach-Object {
+        # 剩余代码相同
+    }
+}
+
+总结
+
+这种方法模拟了 Ant 文件集风格的文件复制功能，支持递归目录和文件模式匹配的文件复制。在 PowerShell 中，Get-ChildItem 和 Copy-Item 的组合使用，能够很好地实现大部分 Ant 文件集的功能。
+
+
+//--------------------------------------
+如果你想使用 YAML 文件来配置要复制的文件和目标目录，可以在 PowerShell 中通过 ConvertFrom-Yaml（在 PowerShell 7+ 中可用）来读取 YAML 文件。下面是一个示例，展示如何在 PowerShell 中实现从 YAML 配置文件读取并执行文件复制操作。
+示例 YAML 配置文件
+
+创建一个 fileCopyConfig.yml 文件，指定源文件和目标目录：
+
+yaml
+
+files:
+  - source: "C:\\project\\src\\folder1\\*.txt"
+    destination: "C:\\project\\dest\\folder1"
+  - source: "C:\\project\\src\\folder2\\*.log"
+    destination: "C:\\project\\dest\\folder2"
+
+在这个 YAML 文件中，每个文件项包含两个键：
+
+    source: 文件的源路径，可以使用通配符。
+    destination: 文件的目标目录。
+
+PowerShell 脚本实现
+
+以下是 PowerShell 脚本，它会解析 YAML 配置文件并基于配置内容执行文件复制操作：
+
+powershell
+
+# 读取 YAML 配置文件
+$configPath = "C:\path\to\fileCopyConfig.yml"  # 配置文件路径
+$configContent = Get-Content -Path $configPath -Raw
+$config = $configContent | ConvertFrom-Yaml
+
+# 遍历配置中的每个文件项并执行复制
+foreach ($fileConfig in $config.files) {
+    $sourcePath = $fileConfig.source
+    $destinationPath = $fileConfig.destination
+
+    # 获取符合条件的文件
+    Get-ChildItem -Path $sourcePath -Recurse | ForEach-Object {
+        $relativePath = $_.FullName.Substring((Split-Path -Path $sourcePath -Parent).Length + 1) # 计算相对路径
+        $destFilePath = Join-Path -Path $destinationPath -ChildPath $relativePath
+
+        # 创建目标文件夹（如果不存在）
+        $destDir = Split-Path -Path $destFilePath
+        if (!(Test-Path -Path $destDir)) {
+            New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+        }
+
+        # 复制文件
+        Copy-Item -Path $_.FullName -Destination $destFilePath -Force
+        Write-Host "Copied $($_.FullName) to $destFilePath"
+    }
+}
+
+解释
+
+    读取 YAML 配置文件：使用 Get-Content -Raw 读取 YAML 文件内容，然后通过 ConvertFrom-Yaml 解析。
+    遍历每个文件项：对每个文件项执行复制操作。
+    计算相对路径：通过去掉源目录路径的前缀，计算出每个文件的相对路径，以便在目标位置保持目录结构。
+    创建目标目录：如果目标目录不存在，使用 New-Item -ItemType Directory 创建。
+    复制文件：使用 Copy-Item 将文件复制到指定的目标路径。
+
+注意事项
+
+    此脚本适用于 PowerShell 7 及更高版本，因为 ConvertFrom-Yaml 是 PowerShell 7 引入的命令。如果你使用的是旧版本的 PowerShell，可以考虑使用 YamlDotNet 库或升级到 PowerShell 7。
+    source 路径中的通配符（如 *.txt）会匹配所有符合条件的文件，这样可以灵活复制不同类型的文件。
+
+
+//--------------------------------------
+是的，可以使用 .properties 文件来实现文件复制配置。这种文件通常用于简单的键值对配置，可以灵活地指定源文件路径和目标目录路径。
+示例 .properties 配置文件
+
+创建一个 fileCopyConfig.properties 文件，配置多个文件的源路径和目标目录。为了便于读取，可以使用编号来区分每组源和目标路径：
+
+properties
+
+file1.source=C:\\project\\src\\folder1\\*.txt
+file1.destination=C:\\project\\dest\\folder1
+
+file2.source=C:\\project\\src\\folder2\\*.log
+file2.destination=C:\\project\\dest\\folder2
+
+在此配置文件中，每一对 source 和 destination 组合代表一个复制任务。文件名后面的编号用于将源和目标路径一一对应。
+PowerShell 脚本实现
+
+PowerShell 没有直接读取 .properties 文件的内置命令，所以可以手动解析文件内容。以下是一个读取 .properties 文件并执行文件复制的示例：
+
+powershell
+
+# 读取 .properties 文件内容
+$configPath = "C:\path\to\fileCopyConfig.properties"
+$configLines = Get-Content -Path $configPath
+
+# 存储配置的哈希表
+$configHash = @{}
+
+# 解析 .properties 文件
+foreach ($line in $configLines) {
+    # 跳过空行或注释行
+    if (-not $line.Trim() -or $line.Trim().StartsWith("#")) {
+        continue
+    }
+
+    # 拆分键值对
+    $key, $value = $line -split '=', 2
+    $configHash[$key.Trim()] = $value.Trim()
+}
+
+# 查找所有文件对，按编号进行复制
+$i = 1
+while ($configHash.ContainsKey("file$i.source")) {
+    $sourcePath = $configHash["file$i.source"]
+    $destinationPath = $configHash["file$i.destination"]
+
+    # 获取符合条件的文件
+    Get-ChildItem -Path $sourcePath -Recurse | ForEach-Object {
+        $relativePath = $_.FullName.Substring((Split-Path -Path $sourcePath -Parent).Length + 1) # 计算相对路径
+        $destFilePath = Join-Path -Path $destinationPath -ChildPath $relativePath
+
+        # 创建目标文件夹（如果不存在）
+        $destDir = Split-Path -Path $destFilePath
+        if (!(Test-Path -Path $destDir)) {
+            New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+        }
+
+        # 复制文件
+        Copy-Item -Path $_.FullName -Destination $destFilePath -Force
+        Write-Host "Copied $($_.FullName) to $destFilePath"
+    }
+
+    $i++
+}
+
+解释
+
+    读取 .properties 文件：使用 Get-Content 读取 .properties 文件的每一行。
+    解析配置文件：将每一行按等号 = 分割为键和值，并将其存储在 $configHash 哈希表中，便于访问。
+    遍历并复制文件：通过编号逐对检查配置中的 source 和 destination，对符合条件的文件执行复制操作。
+    递归复制文件：使用 Get-ChildItem -Recurse 递归地匹配源路径下的文件，并通过 Copy-Item 将文件复制到目标路径，保持目录结构。
+
+使用示例
+
+运行此脚本时，PowerShell 会按照 .properties 文件中的配置，将匹配的文件从指定的源路径复制到目标路径。
+注意事项
+
+    .properties 文件中的路径需要使用双反斜杠 \\，以便正确解析 Windows 文件路径。
+    配置文件中可以添加注释行（以 # 开头），这些行在解析时会被忽略。
+    如果 .properties 文件中包含较多配置项，可以按需要动态扩展 file1, file2 等编号以支持更多文件对。
+
+
+
+//-------------------------------------------------
+是否可以使用下面配置方式，使用逗号隔开source 和 target
+artifactMapping.1=source1,target1
+artifactMapping.2=source2,target2
+ChatGPT said:
+ChatGPT
+
+是的，您可以使用逗号分隔 source 和 target 来配置文件路径。这种格式可以在 PowerShell 中解析成键值对的形式，并根据配置文件中的内容执行文件复制操作。
+示例 .properties 配置文件
+
+使用逗号分隔源路径和目标路径，如下所示：
+
+properties
+
+artifactMapping.1=C:\\project\\src\\folder1\\*.txt,C:\\project\\dest\\folder1
+artifactMapping.2=C:\\project\\src\\folder2\\*.log,C:\\project\\dest\\folder2
+
+PowerShell 脚本实现
+
+下面的 PowerShell 脚本将读取 .properties 文件并解析每个 artifactMapping 项，通过逗号拆分成 source 和 target 路径，然后执行文件复制操作。
+
+powershell
+
+# 读取 .properties 文件内容
+$configPath = "C:\path\to\fileCopyConfig.properties"
+$configLines = Get-Content -Path $configPath
+
+# 存储配置的哈希表
+$configHash = @{}
+
+# 解析 .properties 文件
+foreach ($line in $configLines) {
+    # 跳过空行或注释行
+    if (-not $line.Trim() -or $line.Trim().StartsWith("#")) {
+        continue
+    }
+
+    # 拆分键值对
+    $key, $value = $line -split '=', 2
+    $configHash[$key.Trim()] = $value.Trim()
+}
+
+# 查找所有 artifactMapping 对，并进行复制
+foreach ($key in $configHash.Keys) {
+    if ($key -like "artifactMapping.*") {
+        # 拆分 source 和 destination 路径
+        $sourcePath, $destinationPath = $configHash[$key] -split ','
+
+        # 获取符合条件的文件
+        Get-ChildItem -Path $sourcePath -Recurse | ForEach-Object {
+            $relativePath = $_.FullName.Substring((Split-Path -Path $sourcePath -Parent).Length + 1) # 计算相对路径
+            $destFilePath = Join-Path -Path $destinationPath -ChildPath $relativePath
+
+            # 创建目标文件夹（如果不存在）
+            $destDir = Split-Path -Path $destFilePath
+            if (!(Test-Path -Path $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+
+            # 复制文件
+            Copy-Item -Path $_.FullName -Destination $destFilePath -Force
+            Write-Host "Copied $($_.FullName) to $destFilePath"
+        }
+    }
+}
+
+解释
+
+    读取 .properties 文件：使用 Get-Content 逐行读取 .properties 文件内容。
+    解析键值对：将每行按 = 分割为键和值，并将其存储在 $configHash 哈希表中。
+    过滤 artifactMapping 项：循环遍历所有键值，找到以 artifactMapping. 开头的配置项。
+    拆分 source 和 destination 路径：使用 -split ',' 将配置的值拆分成 sourcePath 和 destinationPath。
+    递归复制文件：使用 Get-ChildItem -Recurse 递归地匹配源路径下的文件，通过 Copy-Item 将文件复制到目标路径，并保持目录结构。
+
+使用示例
+
+运行该脚本后，PowerShell 会根据 .properties 文件的内容，将匹配的文件从源路径复制到指定的目标路径。
+注意事项
+
+    .properties 文件中的路径应使用双反斜杠 \\ 以避免转义问题。
+    确保 .properties 文件的键名格式统一，便于 PowerShell 脚本进行筛选（例如以 artifactMapping. 开头）。
+    此脚本可以灵活扩展，通过增加更多的 artifactMapping 条目来配置不同的文件复制规则。
+
+You said:
+powershell 不是可以直接读取文件参数的吗 是否有更加简单的实现方式
+ChatGPT said:
+ChatGPT
+
+是的，PowerShell 可以直接读取 .properties 文件并用简单的字符串分割处理来解析参数。对于您的需求，我们可以利用 PowerShell 的文件读取和字符串处理功能实现更简洁的脚本，无需创建哈希表或手动筛选键名。下面是一个简化的实现方式：
+.properties 文件示例
+
+使用 .properties 文件配置源路径和目标路径，采用逗号分隔：
+
+properties
+
+artifactMapping.1=C:\\project\\src\\folder1\\*.txt,C:\\project\\dest\\folder1
+artifactMapping.2=C:\\project\\src\\folder2\\*.log,C:\\project\\dest\\folder2
+
+简化的 PowerShell 脚本实现
+
+通过 PowerShell 直接读取配置文件，并在循环中逐行处理每个 artifactMapping 条目：
+
+powershell
+
+# 配置文件路径
+$configPath = "C:\path\to\fileCopyConfig.properties"
+
+# 读取配置文件的每一行
+foreach ($line in Get-Content -Path $configPath) {
+    # 跳过空行和注释行
+    if (-not $line.Trim() -or $line.Trim().StartsWith("#")) {
+        continue
+    }
+
+    # 使用 '=' 分割键和值，进一步用逗号分隔 source 和 destination
+    $key, $paths = $line -split '=', 2
+    if ($paths) {
+        $sourcePath, $destinationPath = $paths -split ','
+
+        # 获取符合条件的文件并复制
+        Get-ChildItem -Path $sourcePath -Recurse | ForEach-Object {
+            $relativePath = $_.FullName.Substring((Split-Path -Path $sourcePath -Parent).Length + 1) # 计算相对路径
+            $destFilePath = Join-Path -Path $destinationPath -ChildPath $relativePath
+
+            # 创建目标文件夹（如果不存在）
+            $destDir = Split-Path -Path $destFilePath
+            if (!(Test-Path -Path $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+
+            # 复制文件
+            Copy-Item -Path $_.FullName -Destination $destFilePath -Force
+            Write-Host "Copied $($_.FullName) to $destFilePath"
+        }
+    }
+}
+
+解释
+
+    读取配置文件：使用 Get-Content 逐行读取 .properties 文件。
+    解析键值对：将每行按 = 分割为键和值，并将值再按逗号分割成 sourcePath 和 destinationPath。
+    递归复制文件：对符合条件的源文件路径进行递归匹配，保持目录结构并复制文件到目标路径。
+
+注意事项
+
+    本方法省去了使用哈希表存储配置的步骤，直接解析并处理文件内容，更为简洁。
+    确保配置文件中的 source 和 destination 路径用逗号分隔，并且路径中使用双反斜杠 \\。
