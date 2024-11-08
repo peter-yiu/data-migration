@@ -740,3 +740,196 @@ ChatGPT
     Azure DevOps 完全支持 BC24 的 AL 项目的编译和部署。
     你可以通过 Docker 容器 来运行 Business Central 实例，并使用 PowerShell 或其他自动化工具将 AL 项目部署到目标服务器。
     设置 CI/CD 管道后，可以自动触发代码更改后的编译和部署，确保开发流程的高效性和自动化。
+
+
+
+
+//------------------------------------------------------------------------
+
+怎么可以获取 azure devops  create release时输入的描述信息
+ChatGPT said:
+ChatGPT
+
+在 Azure DevOps 中，可以通过以下方法获取在创建 Release 时输入的描述信息：
+方法 1：通过 Release 变量 Release.ReleaseDescription
+
+Azure DevOps 提供了一个内置变量 Release.ReleaseDescription，可以用于访问 Release 创建时输入的描述信息。你可以在任何任务中引用该变量，具体方式如下：
+
+powershell
+
+# PowerShell 脚本示例
+Write-Output "Release description: $(Release.ReleaseDescription)"
+
+在任务日志中，这将输出 Release 描述信息。
+方法 2：使用 REST API 获取 Release 描述
+
+如果需要在其他系统或自定义脚本中访问 Release 描述信息，可以使用 Azure DevOps 的 REST API 获取。以下是示例步骤：
+
+    获取 Release ID：在 Release 管道运行时，可以通过 Release.ReleaseId 变量获取 Release ID。
+
+    使用 API 获取 Release 详细信息：
+
+        你可以通过 GET 请求调用 Azure DevOps API 来获取 Release 的详细信息，包括描述信息。
+
+        API 请求格式：
+
+        plaintext
+
+        GET https://dev.azure.com/{organization}/{project}/_apis/release/releases/{releaseId}?api-version=7.0
+
+        替换 {organization}、{project} 和 {releaseId} 为你的实际组织、项目名称和 Release ID。
+
+    获取描述信息：
+        通过 API 响应的 description 字段获取 Release 创建时的描述信息。
+
+示例 PowerShell 脚本
+
+以下是使用 REST API 获取描述信息的 PowerShell 脚本示例：
+
+powershell
+
+# Azure DevOps 组织和项目信息
+$organization = "your-organization"
+$project = "your-project"
+$releaseId = $(Release.ReleaseId)
+
+# 创建 REST API URL
+$url = "https://dev.azure.com/$organization/$project/_apis/release/releases/$releaseId?api-version=7.0"
+
+# 访问令牌（PAT）以获取 Release 信息
+$patToken = "your-personal-access-token"
+$headers = @{
+    Authorization = "Basic " + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$patToken"))
+}
+
+# 发起请求获取 Release 信息
+$response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
+
+# 输出 Release 描述
+$releaseDescription = $response.description
+Write-Output "Release description: $releaseDescription"
+
+关键点
+
+    $(Release.ReleaseDescription) 变量：适用于在 Release Pipeline 内直接使用。
+    REST API：适用于外部工具或自定义脚本。
+
+You said:
+使用 ssh key的方式  如何在github 发起pull request
+ChatGPT said:
+ChatGPT
+
+在 GitHub 上使用 SSH 密钥方式发起 Pull Request 涉及以下几个步骤：
+1. 配置 SSH Key 并连接 GitHub
+
+确保你已在本地机器上生成并配置了 SSH 密钥，并已在 GitHub 上添加该密钥。
+
+    生成 SSH Key（如果还未生成）：
+
+    bash
+
+ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+
+添加 SSH Key 到 GitHub：
+
+    复制 SSH 公钥内容：
+
+    bash
+
+    cat ~/.ssh/id_rsa.pub
+
+    登录 GitHub，前往 Settings > SSH and GPG keys > New SSH Key，粘贴公钥并保存。
+
+测试连接：
+
+bash
+
+    ssh -T git@github.com
+
+    如果配置成功，会显示 GitHub 欢迎信息。
+
+2. 克隆 GitHub 仓库（使用 SSH URL）
+
+使用 SSH URL 而不是 HTTPS URL 克隆仓库，以确保后续的 Git 操作通过 SSH 认证：
+
+bash
+
+git clone git@github.com:username/repository-name.git
+
+3. 创建分支并提交更改
+
+在克隆的仓库中，创建一个新分支，进行更改，并提交代码。
+
+bash
+
+# 切换到仓库目录
+cd repository-name
+
+# 创建并切换到新分支
+git checkout -b my-feature-branch
+
+# 进行更改并提交
+git add .
+git commit -m "Add feature or fix bug"
+
+4. 推送分支到 GitHub
+
+使用 SSH 推送分支到 GitHub：
+
+bash
+
+git push origin my-feature-branch
+
+5. 发起 Pull Request
+
+推送分支后，你可以在 GitHub 上发起 Pull Request：
+
+    前往 GitHub 仓库页面。
+    在仓库页面上，GitHub 会显示一个提示，询问是否要对新分支发起 Pull Request。
+    点击 Compare & pull request，进入 Pull Request 页面。
+    填写 Pull Request 的标题和描述后，点击 Create pull request。
+
+小结
+
+在整个流程中，只需确保使用 SSH URL 克隆和推送代码，GitHub 的 Pull Request 创建过程仍在 Web 界面上进行，因此不受 SSH 或 HTTPS 的影响。
+You said:
+如何设置 azure devops  create release时输入的描述信息为必填
+ChatGPT said:
+ChatGPT
+
+在 Azure DevOps 中，默认情况下没有直接的选项强制用户在创建 Release 时填写描述信息。不过，可以使用 Release Pipeline 的审批步骤和管道变量来实现类似效果。
+方法 1：使用手动审批和提示信息
+
+可以在 Release 的第一个阶段添加一个手动审批步骤，要求用户在描述中输入信息，并在批准前检查描述内容是否完整。这种方法不会完全强制用户输入描述，但可以在没有填写描述的情况下阻止继续执行。
+
+    在 Release Pipeline 中，打开要编辑的 Pipeline。
+    **点击阶段（Stage）**设置手动审批条件：
+        进入 Pre-deployment conditions（部署前条件）。
+        在 Approvals and Checks 下，开启 Approvals。
+        在 Approver(s) 中选择一个或多个用户（可以是创建 Release 的用户自己）。
+    在 Instructions 中添加说明，例如：“请在创建 Release 时填写描述信息，以便通过审批”。
+
+在每次创建 Release 时，用户需要完成审批步骤，审批时可检查描述信息是否已填写完整。
+方法 2：使用 PowerShell 脚本检查描述信息
+
+如果希望更为自动化，可以在第一个任务中添加脚本来检查描述信息是否为空，若为空则阻止 Release 执行。
+
+    在 Release Pipeline 中添加一个 PowerShell 任务，并将其设置为第一个任务。
+
+    使用以下脚本检查描述变量 $(Release.ReleaseDescription) 是否为空。如果为空，脚本将导致 Release 失败。
+
+    powershell
+
+    $description = "$(Release.ReleaseDescription)"
+    if ([string]::IsNullOrWhiteSpace($description)) {
+        Write-Error "Release description is required. Please enter a description and try again."
+        exit 1
+    }
+
+    保存并运行管道。如果描述为空，管道将失败，并显示错误信息。
+
+方法 3：使用 REST API 强制填写描述（高级）
+
+如果你有权限，可以通过 REST API 编写一个自动化脚本，检测 Release 是否包含描述信息并强制填写。这涉及更复杂的自定义自动化。
+
+这几种方法可以为团队成员在创建 Release 时填写描述信息提供提醒或检查。

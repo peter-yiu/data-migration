@@ -1,0 +1,8 @@
+Build Pipeline：
+
+    执行 GitHub 上的代码检出、编译和打包，生成 JAR 文件并将其发布到 Azure DevOps 的 Artifacts。
+
+Release Pipeline：
+
+    从 Build Pipeline 的 Artifact 获取构建产物，无需重新检出代码或重新构建。
+    将构建产物复制到发布工作目录，并通过 SSH 部署到服务器。
