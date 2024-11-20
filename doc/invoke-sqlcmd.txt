@@ -220,3 +220,83 @@ foreach ($file in $sqlFiles) {
         Write-Host "Error: $_" -ForegroundColor Red
     }
 }
+
+
+
+
+
+为什么不能直接使用maven命令下载呢
+ChatGPT said:
+ChatGPT
+
+实际上，直接使用 Maven 命令下载 Artifact 是完全可行的，并且比手动构建下载脚本更简便、可靠，特别是在 Maven 仓库的结构复杂时。Maven 的内置依赖管理功能可以自动处理 Snapshot 版本和校验完整性，以下是实现方法的详细说明。
+直接使用 Maven 命令下载 Snapshot Artifact
+方法
+
+使用 Maven 的 dependency:get 插件来下载指定的 Artifact，包括 Snapshot 版本。
+命令示例
+
+mvn dependency:get -Dartifact=<groupId>:<artifactId>:<version> -DrepoUrl=<repositoryUrl> -Ddest=<outputDirectory>
+
+参数说明
+
+    -Dartifact：指定 Artifact 的坐标（groupId:artifactId:version[:packaging][:classifier]）。
+        例如：com.example:my-artifact:1.0.0-SNAPSHOT。
+    -DrepoUrl：Maven 仓库的 URL。
+        例如：https://nexus.example.com/repository/maven-snapshots。
+    -Ddest：指定下载到的目录。
+
+示例
+
+假设要下载以下 Artifact：
+
+    Group ID：com.example
+    Artifact ID：my-artifact
+    Version：1.0.0-SNAPSHOT
+    Maven 仓库 URL：https://nexus.example.com/repository/maven-snapshots
+    输出目录：C:\downloads
+
+运行以下命令：
+
+mvn dependency:get -Dartifact=com.example:my-artifact:1.0.0-SNAPSHOT -DrepoUrl=https://nexus.example.com/repository/maven-snapshots -Ddest=C:\downloads
+
+优点
+
+    自动处理 Snapshot 版本
+        Maven 会根据 maven-metadata.xml 自动解析最新的 Snapshot 版本。
+    内置完整性校验
+        Maven 会自动下载并验证校验和（SHA1 或 MD5）。
+    支持依赖传递
+        如果 Artifact 有依赖关系，Maven 还能下载这些依赖。
+    无需额外脚本
+        使用标准命令即可完成复杂的任务。
+
+输出示例
+
+[INFO] --- maven-dependency-plugin:3.1.2:get (default-cli) @ standalone-pom ---
+[INFO] Resolving artifact com.example:my-artifact:jar:1.0.0-SNAPSHOT from https://nexus.example.com/repository/maven-snapshots
+[INFO] Downloaded: https://nexus.example.com/repository/maven-snapshots/com/example/my-artifact/1.0.0-SNAPSHOT/my-artifact-1.0.0-20241120.123456-1.jar
+[INFO] Artifact resolved to: C:\downloads\my-artifact-1.0.0-20241120.123456-1.jar
+
+对比手动脚本的优势
+
+    更简洁：无需手动解析 maven-metadata.xml 或拼接 URL。
+    内置校验：Maven 自动校验完整性，无需额外下载 .sha1 文件。
+    复用性强：Maven 已为这种场景优化，减少了脚本维护的复杂度。
+
+适配 PowerShell 脚本
+
+如果需要在 PowerShell 中调用，可以用如下脚本：
+
+# 参数设置
+$artifact = "com.example:my-artifact:1.0.0-SNAPSHOT"
+$repoUrl = "https://nexus.example.com/repository/maven-snapshots"
+$outputPath = "C:\downloads"
+
+# 调用 Maven 下载命令
+$mavenCommand = "mvn dependency:get -Dartifact=$artifact -DrepoUrl=$repoUrl -Ddest=$outputPath"
+Invoke-Expression $mavenCommand
+
+总结
+
+如果你的工作流允许使用 Maven，建议直接采用上述方法。它能自动完成版本解析和完整性校验，比手动脚本更可靠。
