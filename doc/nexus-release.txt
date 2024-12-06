@@ -1,0 +1,32 @@
+# Maven 和 Nexus 配置
+$mavenExecutable = "mvn"   # 确保 Maven 已安装并在环境变量 PATH 中
+$nexusUrl = "https://nexus.example.com/repository/maven-releases" # Nexus 仓库地址
+$groupId = "com.example"   # 目标 Artifact 的 Group ID
+$artifactId = "my-app"     # 目标 Artifact 的 Artifact ID
+$version = "1.0.0"         # 要检查的版本号
+
+# 构建 Maven 命令
+$mvnCommand = @"
+$mavenExecutable dependency:get `
+  -DrepoUrl=$nexusUrl `
+  -DgroupId=$groupId `
+  -DartifactId=$artifactId `
+  -Dversion=$version `
+  -Dtransitive=false
+"@
+
+# 执行 Maven 命令并捕获输出和错误
+$output = & cmd /c $mvnCommand 2>&1
+
+# 检查输出是否包含错误信息
+if ($output -match "Could not resolve artifact") {
+    Write-Host "Artifact $groupId:$artifactId:$version does NOT exist in Nexus."
+    exit 1
+} elseif ($output -match "BUILD SUCCESS") {
+    Write-Host "Artifact $groupId:$artifactId:$version exists in Nexus."
+    exit 0
+} else {
+    Write-Host "Unexpected response from Maven:"
+    Write-Host $output
+    exit 2
+}
