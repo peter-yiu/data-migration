@@ -1,0 +1,46 @@
+# 定义两个文件夹路径
+$folder1 = "C:\Path\To\Folder1"
+$folder2 = "C:\Path\To\Folder2"
+
+# 比较两个文件夹
+function Compare-Folders {
+    param (
+        [string]$Path1,
+        [string]$Path2
+    )
+
+    # 获取文件夹中的所有文件及子文件夹的文件（递归）
+    $files1 = Get-ChildItem -Path $Path1 -Recurse | Where-Object { -not $_.PSIsContainer }
+    $files2 = Get-ChildItem -Path $Path2 -Recurse | Where-Object { -not $_.PSIsContainer }
+
+    # 创建相对路径映射
+    $hash1 = @{}
+    $files1 | ForEach-Object { $hash1[$_.FullName.Substring($Path1.Length)] = $_ }
+
+    $hash2 = @{}
+    $files2 | ForEach-Object { $hash2[$_.FullName.Substring($Path2.Length)] = $_ }
+
+    # 比较文件是否在两个文件夹中都存在
+    foreach ($relativePath in ($hash1.Keys + $hash2.Keys | Sort-Object | Get-Unique)) {
+        if (-not $hash1.ContainsKey($relativePath)) {
+            Write-Host "File missing in Folder1: $Path2$relativePath"
+            exit 1
+        } elseif (-not $hash2.ContainsKey($relativePath)) {
+            Write-Host "File missing in Folder2: $Path1$relativePath"
+            exit 1
+        } else {
+            # 比较文件内容
+            $file1 = $hash1[$relativePath]
+            $file2 = $hash2[$relativePath]
+            if ((Get-FileHash $file1.FullName).Hash -ne (Get-FileHash $file2.FullName).Hash) {
+                Write-Host "File content differs: $relativePath"
+                exit 1
+            }
+        }
+    }
+
+    Write-Host "Folders are identical."
+}
+
+# 调用比较函数
+Compare-Folders -Path1 $folder1 -Path2 $folder2
