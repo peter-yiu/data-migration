@@ -1,0 +1,81 @@
+codeunit 50100 "Excel Import Management"
+{
+    procedure ImportExcelToTable()
+    var
+        TempExcelBuffer: Record "Excel Buffer" temporary;
+        FileName: Text;
+        SheetName: Text;
+        UploadResult: Boolean;
+        FileManagement: Codeunit "File Management";
+    begin
+        // 上传 Excel 文件
+        UploadResult := UploadIntoStream('选择Excel文件', '', '所有文件 (*.*)|*.*', FileName, TempExcelBuffer.FileStream);
+        if not UploadResult then
+            exit;
+
+        SheetName := '工作表1'; // 指定要读取的工作表名称
+        
+        // 读取 Excel 内容到临时缓冲区
+        TempExcelBuffer.OpenBookStream(TempExcelBuffer.FileStream, SheetName);
+        TempExcelBuffer.ReadSheet();
+
+        // 处理数据并插入到目标表
+        ProcessExcelData(TempExcelBuffer);
+    end;
+
+    local procedure ProcessExcelData(var TempExcelBuffer: Record "Excel Buffer" temporary)
+    var
+        TargetTable: Record "Your Target Table";  // 替换为你的目标表
+        RowNo: Integer;
+        MaxRowCount: Integer;
+    begin
+        // 获取最大行数
+        TempExcelBuffer.SetRange("Row No.", 2, 999999);  // 跳过标题行
+        if TempExcelBuffer.FindLast() then
+            MaxRowCount := TempExcelBuffer."Row No.";
+
+        // 逐行处理数据
+        for RowNo := 2 to MaxRowCount do begin
+            TargetTable.Init();
+            
+            // 读取每一列的数据并赋值给表字段
+            // 注意：需要根据实际的 Excel 列和表字段进行映射
+            GetValueAtCell(TempExcelBuffer, RowNo, 1, TargetTable."Field1");  // 第1列
+            GetValueAtCell(TempExcelBuffer, RowNo, 2, TargetTable."Field2");  // 第2列
+            // ... 添加更多字段映射
+
+            // 插入记录
+            if TargetTable.Insert() then;
+        end;
+
+        Message('导入完成！');
+    end;
+
+    local procedure GetValueAtCell(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer; ColNo: Integer; var TargetField: Text)
+    begin
+        TempExcelBuffer.Reset();
+        TempExcelBuffer.SetRange("Row No.", RowNo);
+        TempExcelBuffer.SetRange("Column No.", ColNo);
+        if TempExcelBuffer.FindFirst() then
+            TargetField := TempExcelBuffer."Cell Value as Text"
+        else
+            TargetField := '';
+    end;
+}
+
+
+主要功能说明：
+创建了一个名为 Excel Import Management 的代码单元
+ImportExcelToTable 过程用于：
+让用户选择并上传 Excel 文件
+打开指定的工作表
+读取数据到临时缓冲区
+ProcessExcelData 过程用于：
+遍历 Excel 数据
+将数据映射到目标表字段
+插入记录到目标表
+GetValueAtCell 辅助过程用于获取指定单元格的值
+使用方法：
+将代码中的 Your Target Table 替换为实际的目标表名称
+根据实际需求修改字段映射关系
+可以这样调用该功能：
