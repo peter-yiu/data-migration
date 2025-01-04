@@ -44,3 +44,5 @@ function Compare-Folders {
 
 # 调用比较函数
 Compare-Folders -Path1 $folder1 -Path2 $folder2
+
+test push
