@@ -1,0 +1,124 @@
+    // 获取 Text 类型数据
+    local procedure GetTextAtCell(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer; ColNo: Integer) Text
+    var
+        CellValue: Text;
+    begin
+        TempExcelBuffer.Reset();
+        TempExcelBuffer.SetRange("Row No.", RowNo);
+        TempExcelBuffer.SetRange("Column No.", ColNo);
+        if TempExcelBuffer.FindFirst() then
+            CellValue := TempExcelBuffer."Cell Value as Text"
+        else
+            CellValue := '';
+        exit(CellValue);
+    end;
+
+    // 获取 Code 类型数据
+    local procedure GetCodeAtCell(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer; ColNo: Integer; MaxLength: Integer) Code[250]
+    var
+        CellValue: Text;
+        CodeValue: Code[250];
+    begin
+        CellValue := GetTextAtCell(TempExcelBuffer, RowNo, ColNo);
+        if StrLen(CellValue) > MaxLength then
+            CellValue := CopyStr(CellValue, 1, MaxLength);
+
+        if Evaluate(CodeValue, CellValue) then
+            exit(CodeValue)
+        else
+            exit('');
+    end;
+
+    // 获取 Integer 类型数据
+    local procedure GetIntegerAtCell(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer; ColNo: Integer; var IsValid: Boolean) Integer
+    var
+        CellValue: Text;
+        IntegerValue: Integer;
+    begin
+        IsValid := true;
+        CellValue := GetTextAtCell(TempExcelBuffer, RowNo, ColNo);
+
+        if CellValue = '' then begin
+            IsValid := false;
+            exit(0);
+        end;
+
+        if Evaluate(IntegerValue, CellValue) then
+            exit(IntegerValue)
+        else begin
+            IsValid := false;
+            exit(0);
+        end;
+    end;
+
+    // 获取 Decimal 类型数据
+    local procedure GetDecimalAtCell(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer; ColNo: Integer; var IsValid: Boolean) Decimal
+    var
+        CellValue: Text;
+        DecimalValue: Decimal;
+    begin
+        IsValid := true;
+        CellValue := GetTextAtCell(TempExcelBuffer, RowNo, ColNo);
+
+        if CellValue = '' then begin
+            IsValid := false;
+            exit(0);
+        end;
+
+        if Evaluate(DecimalValue, CellValue) then
+            exit(DecimalValue)
+        else begin
+            IsValid := false;
+            exit(0);
+        end;
+    end;
+
+    // 获取 Date 类型数据
+    local procedure GetDateAtCell(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer; ColNo: Integer; var IsValid: Boolean) Date
+    var
+        CellValue: Text;
+        DateValue: Date;
+    begin
+        IsValid := true;
+        CellValue := GetTextAtCell(TempExcelBuffer, RowNo, ColNo);
+
+        if CellValue = '' then begin
+            IsValid := false;
+            exit(0D);
+        end;
+
+        if Evaluate(DateValue, CellValue) then
+            exit(DateValue)
+        else begin
+            IsValid := false;
+            exit(0D);
+        end;
+    end;
+
+    // 获取 Boolean 类型数据
+    local procedure GetBooleanAtCell(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer; ColNo: Integer; var IsValid: Boolean) Boolean
+    var
+        CellValue: Text;
+        BooleanValue: Boolean;
+    begin
+        IsValid := true;
+        CellValue := GetTextAtCell(TempExcelBuffer, RowNo, ColNo);
+
+        if CellValue = '' then begin
+            IsValid := false;
+            exit(false);
+        end;
+
+        // 支持多种布尔值表示
+        CellValue := LowerCase(CellValue);
+        case CellValue of
+            'true', '1', 'yes', 'y', '是':
+                exit(true);
+            'false', '0', 'no', 'n', '否':
+                exit(false);
+            else begin
+                IsValid := false;
+                exit(false);
+            end;
+        end;
+    end;

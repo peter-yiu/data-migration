@@ -1,0 +1,250 @@
+codeunit 50100 "Excel Import Management"
+{
+    var
+        ErrorLog: Record "Error Log" temporary;
+        ProgressDialog: Dialog;
+        TotalRows: Integer;
+        CurrentRow: Integer;
+        ErrorCount: Integer;
+
+    procedure ImportExcelToTable()
+    var
+        TempExcelBuffer: Record "Excel Buffer" temporary;
+        FileName: Text;
+        SheetName: Text;
+        UploadResult: Boolean;
+    begin
+        // 初始化错误日志
+        InitializeErrorLog();
+
+        // 上传 Excel 文件
+        UploadResult := UploadIntoStream('选择Excel文件', '', 'Excel Files (*.xlsx;*.xls)|*.xlsx;*.xls', FileName, TempExcelBuffer.FileStream);
+        if not UploadResult then
+            Error('未选择文件或上传取消');
+
+        if FileName = '' then
+            Error('文件名不能为空');
+
+        // 验证文件类型
+        if not (FileName.EndsWith('.xlsx') or FileName.EndsWith('.xls')) then
+            Error('请选择有效的Excel文件(.xlsx或.xls)');
+
+        SheetName := '工作表1';
+
+        // 使用 try-catch 处理文件读取错误
+        if not TryReadExcelFile(TempExcelBuffer, SheetName) then
+            Error('无法读取Excel文件。请确保文件格式正确且未被损坏。');
+
+        // 验证Excel结构
+        if not ValidateExcelStructure(TempExcelBuffer) then
+            Error('Excel文件结构不正确。请确保包含所需的列。');
+
+        // 处理数据并插入到目标表
+        ProcessExcelData(TempExcelBuffer);
+
+        // 显示导入结果
+        ShowImportResults();
+    end;
+
+    local procedure TryReadExcelFile(var TempExcelBuffer: Record "Excel Buffer" temporary; SheetName: Text): Boolean
+    begin
+        ClearLastError();
+        if not Codeunit.Run(Codeunit::"Excel Buffer Import", TempExcelBuffer) then
+            exit(false);
+
+        TempExcelBuffer.OpenBookStream(TempExcelBuffer.FileStream, SheetName);
+        TempExcelBuffer.ReadSheet();
+        exit(true);
+    end;
+
+    local procedure ValidateExcelStructure(var TempExcelBuffer: Record "Excel Buffer" temporary): Boolean
+    var
+        RequiredHeaders: List of [Text];
+        HeaderFound: Boolean;
+    begin
+        // 定义必需的列标题
+        RequiredHeaders.Add('Field1');
+        RequiredHeaders.Add('Field2');
+        // ... 添加更多必需的列标题
+
+        // 检查第一行是否包含所有必需的列标题
+        foreach HeaderText in RequiredHeaders do begin
+            HeaderFound := false;
+            TempExcelBuffer.SetRange("Row No.", 1);
+            if TempExcelBuffer.FindSet() then
+                repeat
+                    if TempExcelBuffer."Cell Value as Text" = HeaderText then
+                        HeaderFound := true;
+                until (TempExcelBuffer.Next() = 0) or HeaderFound;
+
+            if not HeaderFound then begin
+                LogError(0, 0, StrSubstNo('缺少必需的列 %1', HeaderText));
+                exit(false);
+            end;
+        end;
+        exit(true);
+    end;
+
+    local procedure ProcessExcelData(var TempExcelBuffer: Record "Excel Buffer" temporary)
+    var
+        TargetTable: Record "Your Target Table";
+        RowNo: Integer;
+    begin
+        // 获取总行数用于进度显示
+        TempExcelBuffer.SetRange("Row No.", 2, 999999);
+        if TempExcelBuffer.FindLast() then
+            TotalRows := TempExcelBuffer."Row No." - 1;
+
+        // 显示进度对话框
+        ProgressDialog.Open('正在处理第 #1#### 行，共 #2#### 行\' +
+                          '已处理: @3@@@@@@@@@@@@@@');
+
+        // 开始事务处理
+        if not IsNullGuid(StartTransaction()) then begin
+            for RowNo := 2 to TotalRows + 1 do begin
+                CurrentRow := RowNo - 1;
+                UpdateProgress();
+
+                // 验证并插入数据
+                if ValidateRowData(TempExcelBuffer, RowNo) then begin
+                    if not TryInsertRecord(TempExcelBuffer, RowNo, TargetTable) then
+                        LogError(RowNo, 0, GetLastErrorText());
+                end;
+
+                // 如果错误太多，中止处理
+                if ErrorCount > 100 then begin
+                    LogError(0, 0, '错误数量过多，导入已中止');
+                    break;
+                end;
+            end;
+
+            // 根据错误情况决定是提交还是回滚
+            if ErrorCount = 0 then
+                CommitTransaction()
+            else
+                RollbackTransaction();
+        end;
+
+        ProgressDialog.Close();
+    end;
+
+    local procedure ValidateRowData(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer): Boolean
+    var
+        IsValid: Boolean;
+    begin
+        IsValid := true;
+
+        // 验证第一列（示例）
+        if not ValidateField1(TempExcelBuffer, RowNo) then begin
+            LogError(RowNo, 1, '字段1格式无效');
+            IsValid := false;
+        end;
+
+        // 验证第二列（示例）
+        if not ValidateField2(TempExcelBuffer, RowNo) then begin
+            LogError(RowNo, 2, '字段2格式无效');
+            IsValid := false;
+        end;
+
+        exit(IsValid);
+    end;
+
+    local procedure ValidateField1(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer): Boolean
+    var
+        CellValue: Text;
+    begin
+        // 获取单元格值
+        GetValueAtCell(TempExcelBuffer, RowNo, 1, CellValue);
+
+        // 添加具体的验证逻辑
+        if CellValue = '' then
+            exit(false);
+
+        // 可以添加更多验证规则
+        exit(true);
+    end;
+
+    local procedure ValidateField2(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer): Boolean
+    var
+        CellValue: Text;
+        DecimalValue: Decimal;
+    begin
+        GetValueAtCell(TempExcelBuffer, RowNo, 2, CellValue);
+
+        // 示例：验证数值格式
+        if not Evaluate(DecimalValue, CellValue) then
+            exit(false);
+
+        exit(true);
+    end;
+
+    local procedure TryInsertRecord(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer; var TargetTable: Record "Your Target Table"): Boolean
+    begin
+        ClearLastError();
+
+        TargetTable.Init();
+
+        // 设置字段值
+        GetValueAtCell(TempExcelBuffer, RowNo, 1, TargetTable."Field1");
+        GetValueAtCell(TempExcelBuffer, RowNo, 2, TargetTable."Field2");
+        // ... 设置更多字段
+
+        exit(TargetTable.Insert(true));
+    end;
+
+    local procedure InitializeErrorLog()
+    begin
+        ErrorLog.DeleteAll();
+        ErrorCount := 0;
+    end;
+
+    local procedure LogError(RowNo: Integer; ColNo: Integer; ErrorMessage: Text)
+    begin
+        ErrorCount += 1;
+        ErrorLog.Init();
+        ErrorLog."Entry No." := ErrorCount;
+        ErrorLog."Row No." := RowNo;
+        ErrorLog."Column No." := ColNo;
+        ErrorLog.Message := ErrorMessage;
+        ErrorLog.Insert();
+    end;
+
+    local procedure UpdateProgress()
+    begin
+        ProgressDialog.Update(1, CurrentRow);
+        ProgressDialog.Update(2, TotalRows);
+        ProgressDialog.Update(3, Round(CurrentRow / TotalRows * 100, 1));
+    end;
+
+    local procedure ShowImportResults()
+    var
+        ResultMessage: Text;
+    begin
+        if ErrorCount = 0 then
+            Message('导入成功完成！共处理 %1 条记录。', TotalRows)
+        else begin
+            ResultMessage := StrSubstNo('导入完成，但存在 %1 个错误。\是否查看错误日志？', ErrorCount);
+            if Confirm(ResultMessage) then
+                ShowErrorLog();
+        end;
+    end;
+
+    local procedure ShowErrorLog()
+    var
+        ErrorLogPage: Page "Error Log";
+    begin
+        ErrorLogPage.SetTableView(ErrorLog);
+        ErrorLogPage.RunModal();
+    end;
+
+    local procedure GetValueAtCell(var TempExcelBuffer: Record "Excel Buffer" temporary; RowNo: Integer; ColNo: Integer; var TargetField: Text)
+    begin
+        TempExcelBuffer.Reset();
+        TempExcelBuffer.SetRange("Row No.", RowNo);
+        TempExcelBuffer.SetRange("Column No.", ColNo);
+        if TempExcelBuffer.FindFirst() then
+            TargetField := TempExcelBuffer."Cell Value as Text"
+        else
+            TargetField := '';
+    end;
+}
