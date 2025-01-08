@@ -28,7 +28,6 @@ codeunit 50100 "Excel Import Management"
     local procedure ProcessExcelData(var TempExcelBuffer: Record "Excel Buffer" temporary)
     var
         ImportedData: Record "Imported Excel Data";
-        TempImportedData: Record "Imported Excel Data" temporary;
         LastBatchNo: Integer;
         CurrentBatchNo: Integer;
         RowNo: Integer;
@@ -52,54 +51,42 @@ codeunit 50100 "Excel Import Management"
             MaxRowCount := TempExcelBuffer."Row No.";
 
         // 初始化计数器
+        SuccessCount := 0;
         ErrorCount := 0;
         ErrorLog := '';
 
-        // 第一步：验证所有数据
+        // 逐行处理数据
         ItemNo := 1;
         for RowNo := 2 to MaxRowCount do begin
-            TempImportedData.Init();
-            TempImportedData."Batch No." := CurrentBatchNo;
-            TempImportedData."Item No." := ItemNo;
+            Clear(ImportedData);
+            ImportedData.Init();
+            ImportedData."Batch No." := CurrentBatchNo;
+            ImportedData."Item No." := ItemNo;
             
             // 读取并验证数据
-            if not ValidateAndAssignRowData(TempExcelBuffer, RowNo, TempImportedData, ErrorLog) then begin
+            if not ValidateAndAssignRowData(TempExcelBuffer, RowNo, ImportedData, ErrorLog) then begin
                 ErrorCount += 1;
                 ErrorLog += StrSubstNo('行号 %1: 数据验证失败\', RowNo);
+                continue;
             end;
-            
-            // 如果验证通过，保存到临时表
-            if ErrorCount = 0 then begin
-                TempImportedData.Insert();
+
+            // 插入记录
+            if ImportedData.Insert() then begin
+                SuccessCount += 1;
                 ItemNo += 1;
+            end else begin
+                ErrorCount += 1;
+                ErrorLog += StrSubstNo('行号 %1: 插入记录失败\', RowNo);
             end;
         end;
-
-        // 如果有任何错误，直接返回
-        if ErrorCount > 0 then begin
-            Message(StrSubstNo('验证失败！发现 %1 个错误：\%2', ErrorCount, ErrorLog));
-            exit;
-        end;
-
-        // 第二步：所有数据验证通过后，批量插入
-        SuccessCount := 0;
-        if TempImportedData.FindSet() then
-            repeat
-                Clear(ImportedData);
-                ImportedData := TempImportedData;
-                if ImportedData.Insert() then
-                    SuccessCount += 1
-                else begin
-                    ErrorCount += 1;
-                    ErrorLog += StrSubstNo('行号 %1: 插入记录失败\', TempImportedData."Item No.");
-                end;
-            until TempImportedData.Next() = 0;
 
         // 显示导入结果
         if ErrorCount = 0 then
             Message('导入完成！共成功导入 %1 条记录，批次号：%2', SuccessCount, CurrentBatchNo)
         else
-            Message(StrSubstNo('导入失败！所有数据已回滚。\错误信息：\%1', ErrorLog));
+            if Confirm(StrSubstNo('导入完成！\成功：%1 条\失败：%2 条\是否查看错误日志？', 
+                SuccessCount, ErrorCount)) then
+                Message(ErrorLog);
     end;
 
     local procedure ValidateAndAssignRowData(var TempExcelBuffer: Record "Excel Buffer" temporary; 
