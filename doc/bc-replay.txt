@@ -204,3 +204,51 @@ playwright.config.cjs
 Edge 浏览器必须是基于 Chromium 的新版本（非 IE 内核）
 确保使用的是实际安装路径，路径中的反斜杠需要双写（\\）
 如果路径中包含空格，确保使用引号包裹路径
+
+
+
+
+
+这个配置不生效   一运行脚本就会自动下载chromium ，如何配置可以不下载，而且使用自己设置的浏览器
+
+对于 @microsoft/bc-replay，我们需要更完整的配置来阻止自动下载。这里有几种方法：
+方法一：在 package.json 中配置：
+{
+  "bc-replay": {
+    "skipBrowserDownload": true,
+    "browsers": [
+      {
+        "name": "chromium",
+        "executablePath": "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+        "launchOptions": {
+          "channel": "msedge"
+        }
+      }
+    ]
+  }
+}
+
+
+方法二：设置环境变量：
+# 设置这些环境变量
+set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+set PLAYWRIGHT_BROWSERS_PATH=0
+
+3. 方法三：在运行脚本之前执行：
+npm config set playwright_skip_browser_download=1
+
+方法四：在代码中直接指定：
+const { chromium } = require('playwright');
+
+const browser = await chromium.launch({
+  channel: 'msedge',  // 使用 Edge
+  // 或者直接指定可执行文件路径
+  executablePath: 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+});
+
+如果以上方法都不生效，可以尝试：
+清除 node_modules 目录
+重新安装依赖
+确保所有配置文件都在正确的位置
+检查环境变量是否正确设置
+建议同时使用多个方法来确保配置生效。
