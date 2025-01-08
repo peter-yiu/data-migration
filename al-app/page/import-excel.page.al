@@ -3,20 +3,22 @@ codeunit 50100 "Excel Import Management"
     procedure ImportExcelToTable()
     var
         TempExcelBuffer: Record "Excel Buffer" temporary;
+        FileManagement: Codeunit "File Management";
+        TempBlob: Codeunit "Temp Blob";
         FileName: Text;
         SheetName: Text;
-        UploadResult: Boolean;
-        FileManagement: Codeunit "File Management";
+        InStream: InStream;
     begin
-        // 上传 Excel 文件
-        UploadResult := UploadIntoStream('选择Excel文件', '', 'Excel Files (*.xlsx)|*.xlsx', FileName, TempExcelBuffer.FileStream);
-        if not UploadResult then
+        // 使用 File Management 上传 Excel 文件
+        FileName := FileManagement.BLOBImport(TempBlob, '选择Excel文件');
+        if FileName = '' then
             exit;
-
+        
+        TempBlob.CreateInStream(InStream);
         SheetName := '工作表1';
         
         // 读取 Excel 内容到临时缓冲区
-        TempExcelBuffer.OpenBookStream(TempExcelBuffer.FileStream, SheetName);
+        TempExcelBuffer.OpenBookStream(InStream, SheetName);
         TempExcelBuffer.ReadSheet();
 
         // 处理数据并插入到目标表
