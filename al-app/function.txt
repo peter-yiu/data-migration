@@ -1,0 +1,211 @@
+// Business Central 内置函数使用指南
+
+// 1. 字符串处理函数
+local procedure StringFunctionExamples()
+var
+    SourceText: Text;
+    Result: Text;
+begin
+    // 1.1 字符串基础操作
+    Result := UpperCase('text');              // 转大写: 'TEXT'
+    Result := LowerCase('TEXT');              // 转小写: 'text'
+    Result := CopyStr('Hello World', 1, 5);   // 截取字符串: 'Hello'
+    Result := PadStr('ABC', 5);               // 右侧补空格至指定长度: 'ABC  '
+    Result := PadStr('ABC', 5, '0');          // 右侧补零: 'ABC00'
+    Result := DelChr('  ABC  ', '<>');        // 删除首尾空格: 'ABC'
+    Result := DelChr('ABC123', '=', '123');   // 删除指定字符: 'ABC'
+    
+    // 1.2 字符串查找和替换
+    if StrPos('Hello World', 'World') > 0 then;    // 查找子字符串位置
+    Result := StrSubstNo('Hello %1', 'World');     // 格式化字符串: 'Hello World'
+    Result := ConvertStr('ABC', 'AC', '13');       // 字符替换: '1B3'
+    
+    // 1.3 字符串格式化
+    Result := Format(1234.567, 0, '<Precision,2:2><Standard Format,0>');  // 数字格式化
+    Result := Format(Today, 0, '<Year4>-<Month,2>-<Day,2>');             // 日期格式化
+end;
+
+// 2. 数值处理函数
+local procedure NumberFunctionExamples()
+var
+    Value: Decimal;
+    IntValue: Integer;
+begin
+    // 2.1 数值运算
+    Value := Round(1234.567, 0.01);     // 四舍五入到小数点后2位
+    Value := Round(1234.567, 1, '=');   // 四舍五入到整十
+    Value := Abs(-123.45);              // 取绝对值: 123.45
+    Value := Power(2, 3);               // 幂运算: 8
+    IntValue := Random(100);            // 生成0-99随机数
+    
+    // 2.2 数值转换
+    Value := Evaluate('123.45');        // 字符串转数值
+    IntValue := Round(123.45, 1, '>');  // 向上取整
+    
+    // 2.3 数值验证
+    if IsNumeric('123.45') then;        // 检查是否为数值
+end;
+
+// 3. 日期时间函数
+local procedure DateTimeFunctionExamples()
+var
+    CurrentDate: Date;
+    CurrentTime: Time;
+    CurrentDateTime: DateTime;
+begin
+    // 3.1 当前日期时间
+    CurrentDate := Today;               // 当前日期
+    CurrentTime := Time;                // 当前时间
+    CurrentDateTime := CurrentDateTime; // 当前日期时间
+    
+    // 3.2 日期计算
+    CurrentDate := CalcDate('<-1D>', Today);     // 昨天
+    CurrentDate := CalcDate('<CW>', Today);      // 本周一
+    CurrentDate := CalcDate('<CM>', Today);      // 本月最后一天
+    CurrentDate := CalcDate('<-CM>', Today);     // 本月第一天
+    CurrentDate := CalcDate('<CQ>', Today);      // 本季度最后一天
+    CurrentDate := CalcDate('<-CY>', Today);     // 本年第一天
+    
+    // 3.3 日期时间转换
+    CurrentDateTime := CreateDateTime(Today, Time);  // 创建日期时间
+    CurrentDate := DT2Date(CurrentDateTime);        // 日期时间转日期
+    CurrentTime := DT2Time(CurrentDateTime);        // 日期时间转时间
+    
+    // 3.4 日期组件
+    IntValue := Date2DMY(Today, 1);    // 获取日
+    IntValue := Date2DMY(Today, 2);    // 获取月
+    IntValue := Date2DMY(Today, 3);    // 获取年
+end;
+
+// 4. 记录处理函数
+local procedure RecordFunctionExamples()
+var
+    RecRef: RecordRef;
+    FldRef: FieldRef;
+begin
+    // 4.1 记录引用
+    RecRef.Open(Database::Customer);
+    FldRef := RecRef.Field(1);         // 通过字段号获取字段引用
+    
+    // 4.2 记录操作
+    if RecRef.FindSet() then;          // 查找记录集
+    if RecRef.FindFirst() then;        // 查找第一条记录
+    if RecRef.FindLast() then;         // 查找最后一条记录
+    RecRef.SetRecFilter();             // 设置记录筛选
+    
+    // 4.3 字段操作
+    FldRef.Value := 'New Value';       // 设置字段值
+    if FldRef.HasFilter then;          // 检查是否有筛选
+end;
+
+// 5. 对话框和消息函数
+local procedure DialogFunctionExamples()
+var
+    Window: Dialog;
+begin
+    // 5.1 消息显示
+    Message('简单消息');
+    Message('带参数消息 %1', 'Parameter');
+    Error('错误消息');
+    
+    // 5.2 确认对话框
+    if Confirm('是否继续?', true) then;  // 默认是
+    if Confirm('是否继续?', false) then; // 默认否
+    
+    // 5.3 进度对话框
+    Window.Open('处理中 #1######');
+    Window.Update(1, '50%');
+    Sleep(1000);                       // 暂停1秒
+    Window.Close();
+end;
+
+// 6. 系统函数
+local procedure SystemFunctionExamples()
+var
+    SessionID: Integer;
+    ClientType: ClientType;
+begin
+    // 6.1 系统信息
+    SessionID := SessionId();          // 获取会话ID
+    ClientType := CurrentClientType;   // 获取客户端类型
+    
+    // 6.2 用户信息
+    if UserId <> '' then;             // 获取用户ID
+    if CompanyName <> '' then;        // 获取公司名称
+    
+    // 6.3 环境检查
+    if GuiAllowed then;               // 是否允许GUI
+    if HyperLink('https://www.example.com') then; // 打开超链接
+end;
+
+// 7. 文件操作函数
+local procedure FileFunctionExamples()
+var
+    FileManagement: Codeunit "File Management";
+    TempBlob: Codeunit "Temp Blob";
+    InStream: InStream;
+    OutStream: OutStream;
+begin
+    // 7.1 文件操作
+    if FileManagement.ServerFileExists('file.txt') then;  // 检查文件是否存在
+    FileManagement.DownloadToStream('file.txt', InStream); // 下载到流
+    
+    // 7.2 Blob操作
+    TempBlob.CreateOutStream(OutStream);
+    TempBlob.CreateInStream(InStream);
+end;
+
+// 8. 加密函数
+local procedure EncryptionFunctionExamples()
+var
+    CryptoMgt: Codeunit "Cryptography Management";
+    HashAlgorithm: Option MD5,SHA1,SHA256,SHA384,SHA512;
+begin
+    // 8.1 哈希计算
+    Text := CryptoMgt.GenerateHash('Text', HashAlgorithm::SHA256);
+    
+    // 8.2 加密解密
+    EncryptedText := CryptoMgt.EncryptText('Text');
+    DecryptedText := CryptoMgt.DecryptText(EncryptedText);
+end;
+
+// 9. 验证函数
+local procedure ValidationFunctionExamples()
+begin
+    // 9.1 基础验证
+    if StrLen(Text) > 10 then
+        Error('文本过长');
+        
+    // 9.2 格式验证
+    if not IsValidEmail('test@example.com') then
+        Error('邮箱格式错误');
+        
+    // 9.3 自定义验证
+    if not ValidateCustomField(FieldValue) then
+        Error('验证失败');
+end;
+
+// 10. 常用辅助函数
+local procedure HelperFunctionExamples()
+begin
+    // 10.1 获取最后错误
+    LastErrorText := GetLastErrorText();
+    
+    // 10.2 清除所有筛选
+    Rec.Reset();
+    
+    // 10.3 复制记录
+    ToRec.TransferFields(FromRec);
+end;
+
+// 11. 最佳实践
+/*
+1. 使用适当的错误处理
+2. 注意性能影响
+3. 合理使用事务处理
+4. 添加适当的注释
+5. 遵循命名规范
+6. 考虑并发访问
+7. 注意数据一致性
+8. 使用正确的数据类型
+*/

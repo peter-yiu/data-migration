@@ -47,11 +47,25 @@ page 50101 "Search Header List"
                 Promoted = true;
                 PromotedCategory = Process;
                 PromotedIsBig = true;
-                Caption = '搜索';
+                Caption = '单条搜索';
                 
                 trigger OnAction()
                 begin
                     ProcessSearch();
+                end;
+            }
+            action(BatchSearch)
+            {
+                ApplicationArea = All;
+                Image = BatchProcessing;
+                Promoted = true;
+                PromotedCategory = Process;
+                PromotedIsBig = true;
+                Caption = '批量搜索';
+                
+                trigger OnAction()
+                begin
+                    ProcessBatchSearch();
                 end;
             }
         }
@@ -67,19 +81,16 @@ page 50101 "Search Header List"
         
         if SearchHeader.FindSet() then begin
             repeat
-                // 组合搜索文本并去除前后空格
                 SearchText := DelChr(
                     StrSubstNo('%1 %2 %3',
                         SearchHeader."Company Name",
                         SearchHeader."First Name",
                         SearchHeader."Last Name"
-                    ), '<>', ' '  // 去除前后空格
+                    ), '<>', ' '
                 );
                 
-                // 只有当 SearchText 不为空时才调用处理程序
                 if SearchText <> '' then
                     ProcessSearchText(SearchText);
-                
             until SearchHeader.Next() = 0;
         end;
     end;
@@ -94,31 +105,81 @@ page 50101 "Search Header List"
         // 初始化搜索参数
         SearchParameters.Init();
         SearchParameters."Search Text" := SearchText;
-        SearchParameters."Min. Score" := 0.7;  // 设置最小匹配分数
-        SearchParameters."Max. Results" := 100; // 设置最大结果数
+        SearchParameters."Min. Score" := 0.7;
+        SearchParameters."Max. Results" := 100;
         
         // 执行搜索
         ScrutinyMgt.Search(
-            SearchParameters,  // 搜索参数
-            SearchResult      // 搜索结果
+            SearchParameters,
+            SearchResult
         );
 
         // 处理搜索结果
         if SearchResult.FindSet() then begin
             repeat
-                // 这里处理每个搜索结果
-                // SearchResult 包含了匹配度信息和匹配到的记录信息
                 ProcessScrutinyResult(SearchResult);
             until SearchResult.Next() = 0;
+        end;
+    end;
+
+    local procedure ProcessBatchSearch()
+    var
+        SearchHeader: Record "Search Header";
+        ScrutinyMgt: Codeunit "Scrutiny Management";
+        SearchParameters: Record "Scrutiny Parameters" temporary;
+        SearchResult: Record "Scrutiny Search Result" temporary;
+        SearchTexts: List of [Text];
+        SearchText: Text;
+    begin
+        SearchHeader.Reset();
+        SearchHeader.SetRange(Status, true);  
+        
+        // 第一步：收集所有搜索文本
+        if SearchHeader.FindSet() then begin
+            repeat
+                SearchText := DelChr(
+                    StrSubstNo('%1 %2 %3',
+                        SearchHeader."Company Name",
+                        SearchHeader."First Name",
+                        SearchHeader."Last Name"
+                    ), '<>', ' '
+                );
+                
+                if SearchText <> '' then
+                    SearchTexts.Add(SearchText);
+            until SearchHeader.Next() = 0;
+        end;
+
+        // 第二步：批量搜索
+        if not SearchTexts.IsEmpty then begin
+            SearchParameters.Init();
+            SearchParameters."Min. Score" := 0.7;
+            SearchParameters."Max. Results" := 1000;
+            
+            ScrutinyMgt.SearchMultiple(
+                SearchTexts,
+                SearchParameters,
+                SearchResult
+            );
+
+            if SearchResult.FindSet() then begin
+                repeat
+                    ProcessScrutinyResult(SearchResult);
+                until SearchResult.Next() = 0;
+            end;
+
+            Message('批量搜索完成，共处理 %1 个搜索文本', SearchTexts.Count);
         end;
     end;
 
     local procedure ProcessScrutinyResult(var SearchResult: Record "Scrutiny Search Result" temporary)
     begin
         // 处理每个搜索结果
-        // 例如：
-        // - 记录匹配结果
-        // - 更新状态
-        // - 生成报告等
+        // SearchResult 字段包括：
+        // - "Search Text": 原始搜索文本
+        // - "Score": 匹配分数
+        // - "Table ID": 匹配到的表ID
+        // - "Record ID": 匹配到的记录ID
+        // 等等...
     end;
 } 

@@ -1,0 +1,384 @@
+local procedure FilterExamples()
+begin
+    // 1. SetRange - 范围筛选
+    Rec.SetRange("No.", '10000', '20000');     // 闭区间，包含边界值
+    Rec.SetRange("Date", Today(), WorkDate()); // 日期范围
+    Rec.SetRange(Status, Status::Open);        // 枚举值筛选
+    
+    // 2. SetFilter - 条件筛选
+    // 数值筛选
+    Rec.SetFilter(Amount, '>%1|<%2', 1000, 100);  // 大于1000或小于100
+    Rec.SetFilter(Quantity, '<>0');               // 不等于0
+    
+    // 文本筛选
+    Rec.SetFilter(Description, '@*TEST*&@*DEMO*'); // 同时包含TEST和DEMO
+    Rec.SetFilter("No.", '10000|20000|30000');    // 多个具体值
+    
+    // 3. 组合筛选
+    Rec.SetRange("Date", Today());
+    Rec.SetFilter(Amount, '>%1', 1000);
+    // 相当于 WHERE Date = TODAY AND Amount > 1000
+end;
+
+local procedure DateFilterExamples()
+begin
+    // 1. 相对日期
+    Rec.SetRange("Date", CalcDate('<-7D>', WorkDate()));  // 7天前
+    Rec.SetRange("Date", CalcDate('<CW>', WorkDate()));   // 本周
+    Rec.SetRange("Date", CalcDate('<CM>', WorkDate()));   // 本月
+    Rec.SetRange("Date", CalcDate('<CQ>', WorkDate()));   // 本季度
+    
+    // 2. 日期区间
+    Rec.SetFilter("Date", '%1..%2', 
+        CalcDate('<-CM>', WorkDate()),    // 本月开始
+        CalcDate('<CM+1M-1D>', WorkDate()) // 本月结束
+    );
+    
+    // 3. 动态日期
+    Rec.SetFilter("Date", '>=%1&<=%2', 
+        CalcDate('<-30D>', WorkDate()),  // 30天前
+        WorkDate()                       // 今天
+    );
+end;
+
+local procedure AdvancedFilterExamples()
+var
+    FilterPageBuilder: FilterPageBuilder;
+begin
+    // 1. 使用 FilterPageBuilder 创建自定义筛选页面
+    FilterPageBuilder.AddTable('Customer', Database::Customer);
+    FilterPageBuilder.AddField('Customer', "No.");
+    FilterPageBuilder.AddField('Customer', Name);
+    FilterPageBuilder.AddField('Customer', "Credit Limit");
+    
+    // 添加默认筛选
+    FilterPageBuilder.SetView('Customer', Rec.GetView());
+    
+    // 设置字段显示顺序
+    FilterPageBuilder.SetTable('Customer', 1);  // 设置表顺序
+    FilterPageBuilder.SetField('Customer', "No.", 1);  // 设置字段顺序
+    
+    if FilterPageBuilder.RunModal() then begin
+        // 应用筛选条件
+        Rec.SetView(FilterPageBuilder.GetView('Customer'));
+        CurrPage.Update(false);
+    end;
+end;
+
+local procedure PerformanceOptimization()
+begin
+    // 1. 使用正确的键
+    Rec.SetCurrentKey("Posting Date");  // 单字段键
+    Rec.SetCurrentKey("Document Type", "Posting Date");  // 复合键
+    
+    // 2. 避免全表扫描
+    Rec.SetRange("Date", WorkDate());  // 先缩小范围
+    Rec.SetFilter(Amount, '>%1', 1000);
+    
+    // 3. 批量处理
+    if Rec.FindSet() then begin
+        repeat
+            // 处理记录
+        until Rec.Next() = 0;
+    end;
+    
+    // 4. 使用临时表优化
+    if Rec.Count > 1000 then  // 数据量大时使用临时表
+        ProcessWithTempTable()
+    else
+        ProcessNormally();
+end;
+
+local procedure ErrorHandlingExamples()
+var
+    EmptyErr: Label '未找到符合条件的记录';
+    DuplicateErr: Label '记录 %1 已存在';
+begin
+    // 1. 检查记录是否存在
+    if not Rec.FindFirst() then
+        Error(EmptyErr);
+        
+    // 2. 使用 Get 安全获取记录
+    if not Rec.Get("No.") then
+        Error(DuplicateErr, "No.");
+        
+    // 3. 事务处理
+    if not Rec.Insert(true) then begin  // true 表示启用事务
+        if Rec.FindFirst() then
+            Error(DuplicateErr, Rec."No.")
+        else
+            Error(GetLastErrorText());
+    end;
+end;
+
+local procedure UIInteractionExamples()
+begin
+    // 1. 获取用户选择
+    CurrPage.SetSelectionFilter(Rec);
+    
+    // 2. 更新界面
+    CurrPage.Update(false);  // false = 不重新读取数据
+    
+    // 3. 保存用户筛选
+    SaveUserFilters();
+    
+    // 4. 恢复默认视图
+    Rec.Reset();
+    CurrPage.Update();
+end;
+
+// 1. 动态字段处理
+local procedure DynamicFieldHandling()
+var
+    RecRef: RecordRef;
+    FldRef: FieldRef;
+begin
+    RecRef.GetTable(Rec);
+    FldRef := RecRef.Field(Rec.FieldNo(Description));
+    FldRef.SetFilter('@*TEST*');
+end;
+
+// 2. 复制筛选条件
+local procedure CopyFilters(var FromRec: Record "Demo Table"; var ToRec: Record "Demo Table")
+begin
+    ToRec.CopyFilters(FromRec);  // 复制所有筛选
+    ToRec.SetView(FromRec.GetView());  // 复制视图（包括排序）
+end;
+
+4. 性能优化建议
+------------------------------------
+### 4.1 键的使用
+- 使用 SetCurrentKey 设置正确的排序键
+- 优先使用主键查询
+- 避免不必要的排序
+
+### 4.2 查询优化
+- 避免使用 @* 这样的模糊匹配
+- 先使用精确条件缩小范围
+- 考虑使用查询而不是复杂的表筛选
+
+### 4.3 批量处理
+
+5. 错误处理最佳实践
+------------------------------------
+### 5.1 基本错误处理
+
+### 5.2 事务处理
+
+6. 用户界面相关
+------------------------------------
+### 6.1 页面更新
+
+### 6.2 保存用户筛选
+
+7. 最佳实践建议
+------------------------------------
+1. 代码规范
+   - 始终在 FindSet 之前使用 Reset
+   - 使用有意义的变量名
+   - 添加适当的注释
+   - 遵循命名规范
+
+2. 性能考虑
+   - 避免重复查询
+   - 使用临时表处理大量数据
+   - 正确使用事务
+   - 注意锁定问题
+
+3. 用户体验
+   - 提供清晰的错误信息
+   - 添加进度显示
+   - 保存用户筛选偏好
+   - 提供重置选项
+
+4. 安全性考虑
+   - 始终验证用户权限
+   - 记录关键操作日志
+   - 防止SQL注入
+   - 使用参数化查询
+
+5. 调试技巧
+   - 使用 MESSAGE 显示筛选条件
+   - 检查记录数量
+   - 验证键的使用情况
+   - 监控性能瓶颈
+
+8. 常见问题解决
+------------------------------------
+1. 记录锁定
+   - 使用 LockTable 防止并发修改
+   - 合理使用事务范围
+
+2. 性能问题
+   - 检查索引使用情况
+   - 优化筛选条件
+   - 考虑使用临时表
+
+3. 并发处理
+   - 使用 ModifyAll 批量更新
+   - 正确处理事务
+   - 考虑记录锁定
+
+注意事项：
+------------------------------------
+1. 始终考虑性能影响
+2. 注意数据一致性
+3. 提供适当的用户反馈
+4. 做好错误处理
+5. 考虑并发情况
+6. 注意代码可维护性
+7. 遵循BC最佳实践
+
+8. 定期检查筛选性能
+9. 记录重要的筛选操作
+10. 考虑多语言环境
+11. 保持代码一致性
+12. 定期更新文档
+
+local procedure AdvancedDateFilterExamples()
+begin
+    // 1. 财务期间筛选
+    Rec.SetFilter("Posting Date", 
+        '%1..%2',
+        AccountingPeriod.GetFiscalYearStartDate(WorkDate()),
+        AccountingPeriod.GetFiscalYearEndDate(WorkDate())
+    );
+    
+    // 2. 动态会计期间
+    Rec.SetFilter("Posting Date", 
+        '%1..%2',
+        CalcDate('<-CM-1M>', WorkDate()),  // 上月开始
+        CalcDate('<-CM-1D>', WorkDate())   // 上月结束
+    );
+    
+    // 3. 自定义期间
+    Rec.SetFilter("Date", '%1..%2|%3..%4',
+        DMY2Date(1, 1, Date2DMY(WorkDate(), 3)),    // 本年1月1日
+        DMY2Date(31, 3, Date2DMY(WorkDate(), 3)),   // 本年3月31日
+        DMY2Date(1, 7, Date2DMY(WorkDate(), 3)),    // 本年7月1日
+        DMY2Date(30, 9, Date2DMY(WorkDate(), 3))    // 本年9月30日
+    );
+end;
+
+local procedure ComplexFilterExamples()
+var
+    Customer: Record Customer;
+    FilterText: Text;
+begin
+    // 1. 动态构建筛选条件
+    FilterText := '';
+    if Customer.FindSet() then
+        repeat
+            if FilterText <> '' then
+                FilterText += '|';
+            FilterText += Customer."No.";
+        until Customer.Next() = 0;
+    
+    Rec.SetFilter("Customer No.", FilterText);
+    
+    // 2. 组合条件筛选
+    Rec.SetFilter("Amount", 
+        '%1..%2|<%3&<>%4', 
+        1000,    // 大于等于1000
+        5000,    // 小于等于5000
+        0,       // 或小于0
+        -999     // 但不等于-999
+    );
+    
+    // 3. 使用 FILTERGROUP 管理多组筛选
+    Rec.FilterGroup(2);  // 切换到筛选组2
+    Rec.SetRange(Status, Status::Open);
+    Rec.FilterGroup(0);  // 返回默认筛选组
+end;
+
+local procedure TempTableOptimization()
+var
+    TempRec: Record "Sales Line" temporary;
+    Window: Dialog;
+begin
+    Window.Open('处理中 #1##########');
+    
+    // 1. 使用临时表进行复杂计算
+    if Rec.FindSet() then
+        repeat
+            Window.Update(1, Rec."No.");
+            if QualifiesForProcessing(Rec) then begin
+                TempRec.Init();
+                TempRec.TransferFields(Rec);
+                TempRec.Insert();
+            end;
+        until Rec.Next() = 0;
+        
+    // 2. 处理临时表数据
+    if TempRec.FindSet() then
+        repeat
+            ProcessRecord(TempRec);
+        until TempRec.Next() = 0;
+        
+    Window.Close();
+end;
+
+local procedure FilterManagement()
+var
+    FilterTokens: Record "Filter Tokens" temporary;
+    UserFilters: Record "User Filter Settings";
+begin
+    // 1. 保存用户筛选设置
+    UserFilters.SaveFilters(
+        Database::"Sales Header",
+        PAGE::"Sales Order List",
+        Rec.GetFilters()
+    );
+    
+    // 2. 加载用户筛选设置
+    if UserFilters.LoadFilters(
+        Database::"Sales Header",
+        PAGE::"Sales Order List"
+    ) then
+        Rec.SetView(UserFilters.GetFilters());
+        
+    // 3. 解析筛选令牌
+    FilterTokens.ParseFilterTokens(Rec.GetFilters());
+end;
+
+local procedure PerformanceMonitoring()
+var
+    StartTime: DateTime;
+    Duration: Duration;
+begin
+    StartTime := CurrentDateTime;
+    
+    // 执行筛选操作
+    ApplyComplexFilters();
+    
+    // 计算执行时间
+    Duration := CurrentDateTime - StartTime;
+    if Duration > 1000 then  // 如果超过1秒
+        LogPerformanceIssue('筛选操作耗时过长', Duration);
+end;
+
+// 辅助函数
+local procedure QualifiesForProcessing(var Rec: Record "Sales Line"): Boolean
+begin
+    exit(
+        (Rec.Amount > 0) and 
+        (Rec.Type = Rec.Type::Item) and 
+        (not Rec.IsEmpty)
+    );
+end;
+
+local procedure ProcessRecord(var TempRec: Record "Sales Line" temporary)
+begin
+    // 处理逻辑
+end;
+
+local procedure LogPerformanceIssue(Message: Text; Duration: Duration)
+var
+    ActivityLog: Record "Activity Log";
+begin
+    ActivityLog.LogActivity(
+        ActivityLog.Type::System,
+        ActivityLog.Status::Failed,
+        StrSubstNo('%1 (%2 ms)', Message, Duration)
+    );
+end;

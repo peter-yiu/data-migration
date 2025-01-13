@@ -1,0 +1,236 @@
+// Business Central 页面操作指南
+
+// 1. 基础页面结构
+page 50100 "Demo List Page"
+{
+    PageType = List;
+    SourceTable = "Demo Table";
+    
+    layout
+    {
+        area(Content)
+        {
+            repeater(GroupName)
+            {
+                field("No."; Rec."No.") { ApplicationArea = All; }
+                field(Description; Rec.Description) 
+                { 
+                    ApplicationArea = All;
+                    ToolTip = '输入描述';
+                    
+                    trigger OnValidate()
+                    begin
+                        ValidateDescription();
+                    end;
+                }
+            }
+        }
+        
+        area(FactBoxes)
+        {
+            part(InfoPart; "Demo Info Part")
+            {
+                ApplicationArea = All;
+                SubPageLink = "No." = field("No.");
+            }
+        }
+    }
+    
+    actions
+    {
+        area(Processing)
+        {
+            action(Process)
+            {
+                ApplicationArea = All;
+                Image = Process;
+                Promoted = true;
+                PromotedCategory = Process;
+                
+                trigger OnAction()
+                begin
+                    ProcessRecord();
+                end;
+            }
+        }
+    }
+    
+    // 2. 页面事件处理
+    trigger OnOpenPage()
+    begin
+        // 设置初始筛选
+        SetInitialFilters();
+        // 加载用户设置
+        LoadUserSettings();
+    end;
+    
+    trigger OnAfterGetRecord()
+    begin
+        // 更新页面计算字段
+        UpdateCalculatedFields();
+    end;
+    
+    trigger OnAfterGetCurrRecord()
+    begin
+        // 更新页面控件状态
+        UpdateControlVisibility();
+    end;
+    
+    // 3. 用户交互处理
+    local procedure HandleUserSelection()
+    var
+        SelectedRecords: Record "Demo Table";
+    begin
+        CurrPage.SetSelectionFilter(SelectedRecords);
+        if SelectedRecords.IsEmpty then
+            Error('请至少选择一条记录');
+            
+        if not Confirm('是否处理选中的 %1 条记录？', true, SelectedRecords.Count) then
+            exit;
+            
+        ProcessSelectedRecords(SelectedRecords);
+    end;
+    
+    // 4. 页面状态管理
+    local procedure UpdateControlVisibility()
+    begin
+        ProcessEnabled := Rec.Status = Rec.Status::Open;
+        CurrPage.Update(false);
+    end;
+    
+    // 5. 页面数据刷新
+    local procedure RefreshPage(ReloadData: Boolean)
+    begin
+        if ReloadData then begin
+            CurrPage.Update(true);  // 重新加载数据
+        end else begin
+            CurrPage.Update(false); // 仅更新显示
+        end;
+    end;
+    
+    // 6. 高级查找功能
+    local procedure AdvancedSearch()
+    var
+        FilterPageBuilder: FilterPageBuilder;
+    begin
+        FilterPageBuilder.AddTable('Demo Table', Database::"Demo Table");
+        FilterPageBuilder.AddField('Demo Table', "No.");
+        FilterPageBuilder.AddField('Demo Table', Description);
+        
+        FilterPageBuilder.RunModal();
+        
+        if FilterPageBuilder.HasFilter() then begin
+            Rec.SetView(FilterPageBuilder.GetView('Demo Table'));
+            CurrPage.Update(false);
+        end;
+    end;
+    
+    // 7. 页面导航
+    local procedure NavigateToRelatedPage()
+    var
+        RelatedPage: Page "Related Page";
+    begin
+        RelatedPage.SetRecord(Rec);
+        RelatedPage.RunModal();
+        
+        if RelatedPage.GetAction() = Action::LookupOK then
+            RefreshPage(true);
+    end;
+    
+    // 8. 批量更新处理
+    local procedure BatchUpdate()
+    var
+        BatchUpdateMgt: Codeunit "Batch Update Management";
+        Window: Dialog;
+    begin
+        Window.Open('处理中... @1@@@@@@@@@');
+        Window.Update(1, '准备数据');
+        
+        if not BatchUpdateMgt.Initialize(Rec) then
+            Error('初始化失败');
+            
+        Window.Update(1, '更新记录');
+        BatchUpdateMgt.ProcessRecords();
+        
+        Window.Close();
+        RefreshPage(true);
+    end;
+    
+    // 9. 页面状态保存
+    local procedure SavePageState()
+    var
+        UserPageSettings: Record "User Page Settings";
+    begin
+        UserPageSettings.SaveSettings(
+            CurrPage.ObjectId(false),
+            Rec.GetView(),
+            CurrPage.GetFilter("No.")
+        );
+    end;
+    
+    // 10. 错误处理
+    local procedure HandleError(ErrorText: Text)
+    begin
+        if GuiAllowed then
+            Error(ErrorText)
+        else
+            LogError(ErrorText);
+    end;
+    
+    // 11. 页面验证
+    local procedure ValidatePageData(): Boolean
+    begin
+        if Rec.IsEmpty then begin
+            Message('没有数据需要处理');
+            exit(false);
+        end;
+        
+        if not CheckUserPermissions() then begin
+            Error('权限不足');
+            exit(false);
+        end;
+        
+        exit(true);
+    end;
+    
+    var
+        ProcessEnabled: Boolean;
+        [InDataSet]
+        DescriptionVisible: Boolean;
+}
+
+// 12. 页面扩展示例
+pageextension 50101 "Demo List Page Ext" extends "Demo List Page"
+{
+    layout
+    {
+        addafter(Description)
+        {
+            field("Custom Field"; Rec."Custom Field")
+            {
+                ApplicationArea = All;
+                Visible = CustomFieldVisible;
+            }
+        }
+    }
+    
+    actions
+    {
+        addafter(Process)
+        {
+            action(CustomAction)
+            {
+                ApplicationArea = All;
+                Image = Action;
+                
+                trigger OnAction()
+                begin
+                    HandleCustomAction();
+                end;
+            }
+        }
+    }
+    
+    var
+        CustomFieldVisible: Boolean;
+}
