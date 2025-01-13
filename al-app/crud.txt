@@ -1,0 +1,313 @@
+// Business Central 表操作指南 (CRUD - Create, Read, Update, Delete)
+
+// 1. 表定义示例
+table 50100 "Demo Table"
+{
+    DataClassification = CustomerContent;
+    
+    fields
+    {
+        field(1; "No."; Code[20])
+        {
+            Caption = '编号';
+            NotBlank = true;
+        }
+        field(2; Description; Text[100])
+        {
+            Caption = '描述';
+        }
+        field(3; Amount; Decimal)
+        {
+            Caption = '金额';
+            DecimalPlaces = 2;
+        }
+        field(4; Status; Option)
+        {
+            Caption = '状态';
+            OptionMembers = New,Processing,Completed;
+            OptionCaption = '新建,处理中,已完成';
+        }
+        field(5; "Created Date"; Date)
+        {
+            Caption = '创建日期';
+            Editable = false;
+        }
+        field(6; "Created By"; Code[50])
+        {
+            Caption = '创建人';
+            Editable = false;
+        }
+    }
+    
+    keys
+    {
+        key(PK; "No.") { Clustered = true; }
+        key(Status; Status, "Created Date") { }
+    }
+}
+
+// 2. 页面定义
+page 50100 "Demo List"
+{
+    PageType = List;
+    ApplicationArea = All;
+    UsageCategory = Lists;
+    SourceTable = "Demo Table";
+    CardPageId = "Demo Card";
+    
+    layout
+    {
+        area(Content)
+        {
+            repeater(GroupName)
+            {
+                field("No."; Rec."No.") 
+                { 
+                    ApplicationArea = All;
+                    
+                    trigger OnValidate()
+                    begin
+                        ValidateNo();
+                    end;
+                }
+                field(Description; Rec.Description) { ApplicationArea = All; }
+                field(Amount; Rec.Amount) { ApplicationArea = All; }
+                field(Status; Rec.Status) { ApplicationArea = All; }
+                field("Created Date"; Rec."Created Date") { ApplicationArea = All; }
+                field("Created By"; Rec."Created By") { ApplicationArea = All; }
+            }
+        }
+    }
+    
+    actions
+    {
+        area(Processing)
+        {
+            action(CreateNew)
+            {
+                ApplicationArea = All;
+                Caption = '新建';
+                Image = New;
+                Promoted = true;
+                
+                trigger OnAction()
+                begin
+                    CreateNewRecord();
+                end;
+            }
+            
+            action(BatchUpdate)
+            {
+                ApplicationArea = All;
+                Caption = '批量更新';
+                Image = UpdateDescription;
+                
+                trigger OnAction()
+                begin
+                    UpdateSelectedRecords();
+                end;
+            }
+            
+            action(DeleteSelected)
+            {
+                ApplicationArea = All;
+                Caption = '删除选中';
+                Image = Delete;
+                
+                trigger OnAction()
+                begin
+                    DeleteSelectedRecords();
+                end;
+            }
+        }
+    }
+    
+    // 3. 创建记录
+    local procedure CreateNewRecord()
+    var
+        DemoRec: Record "Demo Table";
+    begin
+        // 3.1 基本创建
+        DemoRec.Init();
+        DemoRec."No." := GetNextNo();
+        DemoRec.Description := '新记录';
+        DemoRec.Status := DemoRec.Status::New;
+        DemoRec."Created Date" := Today;
+        DemoRec."Created By" := UserId;
+        
+        // 3.2 使用事务处理
+        if DemoRec.Insert(true) then begin
+            Message('记录创建成功');
+            CurrPage.Update(false);
+        end else
+            Error('创建记录失败：%1', GetLastErrorText);
+    end;
+    
+    // 4. 读取记录
+    local procedure ReadRecordExamples()
+    var
+        DemoRec: Record "Demo Table";
+    begin
+        // 4.1 按主键读取
+        if DemoRec.Get('10000') then
+            ProcessRecord(DemoRec);
+            
+        // 4.2 使用筛选
+        DemoRec.SetRange(Status, DemoRec.Status::New);
+        DemoRec.SetFilter(Amount, '>%1', 1000);
+        
+        // 4.3 遍历记录
+        if DemoRec.FindSet() then begin
+            repeat
+                ProcessRecord(DemoRec);
+            until DemoRec.Next() = 0;
+        end;
+        
+        // 4.4 使用临时表
+        LoadToTempTable(DemoRec);
+    end;
+    
+    // 5. 更新记录
+    local procedure UpdateSelectedRecords()
+    var
+        DemoRec: Record "Demo Table";
+        SelectionFilter: Text;
+        UpdateCount: Integer;
+        Window: Dialog;
+    begin
+        // 5.1 获取选中记录
+        CurrPage.SetSelectionFilter(DemoRec);
+        if DemoRec.IsEmpty then
+            Error('请至少选择一条记录');
+            
+        // 5.2 确认更新
+        if not Confirm('确认更新选中的 %1 条记录？', true, DemoRec.Count) then
+            exit;
+            
+        // 5.3 显示进度
+        Window.Open('正在更新记录 #1### / #2###');
+        Window.Update(2, DemoRec.Count);
+        
+        // 5.4 批量更新
+        if DemoRec.FindSet() then begin
+            repeat
+                UpdateCount += 1;
+                Window.Update(1, UpdateCount);
+                
+                // 更新记录
+                DemoRec.Status := DemoRec.Status::Processing;
+                DemoRec.Modify(true);
+            until DemoRec.Next() = 0;
+        end;
+        
+        Window.Close();
+        Message('已成功更新 %1 条记录', UpdateCount);
+        CurrPage.Update(false);
+    end;
+    
+    // 6. 删除记录
+    local procedure DeleteSelectedRecords()
+    var
+        DemoRec: Record "Demo Table";
+        DeleteCount: Integer;
+    begin
+        // 6.1 获取选中记录
+        CurrPage.SetSelectionFilter(DemoRec);
+        if DemoRec.IsEmpty then
+            Error('请至少选择一条记录');
+            
+        // 6.2 确认删除
+        if not Confirm('确认删除选中的 %1 条记录？', false, DemoRec.Count) then
+            exit;
+            
+        // 6.3 检查是否可以删除
+        if DemoRec.FindSet() then begin
+            repeat
+                if not CanDeleteRecord(DemoRec) then
+                    Error('记录 %1 不能删除', DemoRec."No.");
+            until DemoRec.Next() = 0;
+        end;
+        
+        // 6.4 执行删除
+        if DemoRec.FindSet() then begin
+            repeat
+                DeleteCount += 1;
+                DemoRec.Delete(true);
+            until DemoRec.Next() = 0;
+        end;
+        
+        Message('已成功删除 %1 条记录', DeleteCount);
+        CurrPage.Update(false);
+    end;
+    
+    // 7. 辅助函数
+    local procedure GetNextNo(): Code[20]
+    var
+        NoSeriesMgt: Codeunit NoSeriesManagement;
+        Setup: Record "Demo Setup";
+    begin
+        Setup.Get();
+        Setup.TestField("Demo Nos.");
+        exit(NoSeriesMgt.GetNextNo(Setup."Demo Nos.", WorkDate(), true));
+    end;
+    
+    local procedure ValidateNo()
+    var
+        DemoRec: Record "Demo Table";
+    begin
+        if DemoRec.Get(Rec."No.") then
+            Error('编号 %1 已存在', Rec."No.");
+    end;
+    
+    local procedure CanDeleteRecord(var DemoRec: Record "Demo Table"): Boolean
+    begin
+        // 检查记录是否可以删除
+        if DemoRec.Status = DemoRec.Status::Completed then
+            exit(false);
+        exit(true);
+    end;
+    
+    local procedure ProcessRecord(var DemoRec: Record "Demo Table")
+    begin
+        // 处理单条记录的逻辑
+    end;
+    
+    local procedure LoadToTempTable(var DemoRec: Record "Demo Table")
+    var
+        TempRec: Record "Demo Table" temporary;
+    begin
+        if DemoRec.FindSet() then
+            repeat
+                TempRec := DemoRec;
+                TempRec.Insert();
+            until DemoRec.Next() = 0;
+    end;
+}
+
+// 8. 最佳实践
+/*
+1. 数据验证
+   - 在插入和修改前验证数据
+   - 使用字段触发器进行验证
+   - 检查必填字段
+
+2. 错误处理
+   - 使用事务处理确保数据一致性
+   - 提供清晰的错误消息
+   - 记录重要操作日志
+
+3. 性能优化
+   - 使用适当的键
+   - 批量处理大量记录
+   - 使用临时表优化性能
+
+4. 用户体验
+   - 显示操作进度
+   - 提供确认对话框
+   - 及时更新界面
+
+5. 安全性
+   - 检查用户权限
+   - 验证数据访问权限
+   - 记录关键操作
+*/
