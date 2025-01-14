@@ -1,0 +1,341 @@
+// Business Central Codeunit 使用指南
+
+// 1. 基础 Codeunit
+codeunit 50100 "Demo Management"
+{
+    Permissions = TableData "Demo Table" = rimd;
+    
+    // 1.1 主要处理过程
+    procedure ProcessDocument(var DemoHeader: Record "Demo Header")
+    var
+        DemoLine: Record "Demo Line";
+    begin
+        // 前置检查
+        CheckDocument(DemoHeader);
+        
+        // 开始事务处理
+        DemoHeader.LockTable();
+        
+        // 处理头部
+        ProcessHeader(DemoHeader);
+        
+        // 处理行项目
+        DemoLine.SetRange("Document No.", DemoHeader."No.");
+        if DemoLine.FindSet() then
+            repeat
+                ProcessLine(DemoLine);
+            until DemoLine.Next() = 0;
+            
+        // 更新头部
+        UpdateHeader(DemoHeader);
+    end;
+    
+    // 1.2 内部过程
+    local procedure CheckDocument(var DemoHeader: Record "Demo Header")
+    begin
+        DemoHeader.TestField("No.");
+        DemoHeader.TestField(Status, DemoHeader.Status::Open);
+        
+        OnAfterCheckDocument(DemoHeader);
+    end;
+    
+    // 1.3 事件发布
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterCheckDocument(var DemoHeader: Record "Demo Header")
+    begin
+    end;
+}
+
+// 2. 事件订阅 Codeunit
+codeunit 50101 "Demo Event Subscribers"
+{
+    // 2.1 单表事件订阅
+    [EventSubscriber(ObjectType::Table, Database::"Demo Table", 'OnAfterInsertEvent', '', false, false)]
+    local procedure HandleAfterInsert(var Rec: Record "Demo Table")
+    begin
+        CreateLog(Rec, 'Insert');
+    end;
+    
+    // 2.2 Codeunit 事件订阅
+    [EventSubscriber(ObjectType::Codeunit, Codeunit::"Demo Management", 'OnAfterCheckDocument', '', false, false)]
+    local procedure HandleAfterCheckDocument(var DemoHeader: Record "Demo Header")
+    begin
+        ValidateCustomFields(DemoHeader);
+    end;
+    
+    // 2.3 内部过程
+    local procedure CreateLog(var Rec: Record "Demo Table"; Operation: Text)
+    var
+        ActivityLog: Record "Activity Log";
+    begin
+        ActivityLog.LogActivity(
+            Rec,
+            ActivityLog.Status::Success,
+            StrSubstNo('Operation: %1', Operation)
+        );
+    end;
+}
+
+// 3. 工具 Codeunit
+codeunit 50102 "Demo Utilities"
+{
+    // 3.1 公共函数
+    procedure FormatAmount(Amount: Decimal): Text
+    begin
+        exit(Format(
+            Amount,
+            0,
+            '<Precision,2:2><Standard Format,0>'
+        ));
+    end;
+    
+    // 3.2 验证函数
+    procedure ValidateEmail(Email: Text): Boolean
+    var
+        Regex: Codeunit Regex;
+    begin
+        exit(Regex.IsMatch(
+            Email,
+            '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        ));
+    end;
+    
+    // 3.3 转换函数
+    procedure ConvertToBase64(InputText: Text): Text
+    var
+        Convert: Codeunit "Base64 Convert";
+    begin
+        exit(Convert.ToBase64(InputText));
+    end;
+}
+
+// 4. 业务逻辑 Codeunit
+codeunit 50103 "Demo Business Logic"
+{
+    // 4.1 业务规则验证
+    procedure ValidateBusinessRules(var DemoHeader: Record "Demo Header"): Boolean
+    var
+        Result: Boolean;
+    begin
+        Result := true;
+        
+        OnBeforeValidateBusinessRules(DemoHeader, Result);
+        
+        if not Result then
+            exit(false);
+            
+        // 执行验证逻辑
+        if not ValidateHeader(DemoHeader) then
+            exit(false);
+            
+        if not ValidateLines(DemoHeader) then
+            exit(false);
+            
+        OnAfterValidateBusinessRules(DemoHeader, Result);
+        
+        exit(Result);
+    end;
+    
+    // 4.2 业务处理
+    procedure ProcessBusinessLogic(var DemoHeader: Record "Demo Header")
+    var
+        DemoPost: Codeunit "Demo Posting";
+    begin
+        if not ValidateBusinessRules(DemoHeader) then
+            Error(GetLastErrorText);
+            
+        // 执行业务逻辑
+        DemoPost.PostDocument(DemoHeader);
+    end;
+    
+    // 4.3 集成事件
+    [IntegrationEvent(false, false)]
+    local procedure OnBeforeValidateBusinessRules(var DemoHeader: Record "Demo Header"; var Result: Boolean)
+    begin
+    end;
+    
+    [IntegrationEvent(false, false)]
+    local procedure OnAfterValidateBusinessRules(var DemoHeader: Record "Demo Header"; var Result: Boolean)
+    begin
+    end;
+}
+
+// 5. 过账 Codeunit
+codeunit 50104 "Demo Posting"
+{
+    // 5.1 过账主过程
+    procedure PostDocument(var DemoHeader: Record "Demo Header")
+    var
+        DemoLine: Record "Demo Line";
+        PostedHeader: Record "Posted Demo Header";
+        PostedLine: Record "Posted Demo Line";
+    begin
+        // 开始事务处理
+        DemoHeader.LockTable();
+        PostedHeader.LockTable();
+        
+        // 前置检查
+        CheckBeforePosting(DemoHeader);
+        
+        // 创建已过账单据
+        CreatePostedHeader(DemoHeader, PostedHeader);
+        
+        // 处理行项目
+        DemoLine.SetRange("Document No.", DemoHeader."No.");
+        if DemoLine.FindSet() then
+            repeat
+                CreatePostedLine(DemoLine, PostedLine, PostedHeader);
+            until DemoLine.Next() = 0;
+            
+        // 更新原始单据
+        UpdateOriginalDocument(DemoHeader);
+        
+        // 提交事务
+        Commit();
+    end;
+}
+
+// 6. 报表处理 Codeunit
+codeunit 50105 "Demo Report Management"
+{
+    // 6.1 报表数据准备
+    procedure PrepareReportData(var DemoHeader: Record "Demo Header"): Text
+    var
+        TempBlob: Codeunit "Temp Blob";
+        OutStream: OutStream;
+        InStream: InStream;
+        ResultText: Text;
+    begin
+        // 准备数据
+        TempBlob.CreateOutStream(OutStream);
+        
+        // 写入数据
+        WriteReportData(DemoHeader, OutStream);
+        
+        // 读取结果
+        TempBlob.CreateInStream(InStream);
+        InStream.ReadText(ResultText);
+        
+        exit(ResultText);
+    end;
+}
+
+// 7. API 集成 Codeunit
+codeunit 50106 "Demo API Integration"
+{
+    // 7.1 API 调用
+    procedure CallExternalAPI(Endpoint: Text; Payload: Text): Text
+    var
+        Client: HttpClient;
+        Request: HttpRequestMessage;
+        Response: HttpResponseMessage;
+        Content: HttpContent;
+        Result: Text;
+    begin
+        // 准备请求
+        Request.Method := 'POST';
+        Request.SetRequestUri(Endpoint);
+        
+        Content.WriteFrom(Payload);
+        Content.GetHeaders().Add('Content-Type', 'application/json');
+        Request.Content := Content;
+        
+        // 发送请求
+        Client.Send(Request, Response);
+        
+        // 处理响应
+        Response.Content.ReadAs(Result);
+        exit(Result);
+    end;
+}
+
+// 8. 缓存管理 Codeunit
+codeunit 50107 "Demo Cache Management"
+{
+    var
+        Cache: Dictionary of [Text, Text];
+        
+    // 8.1 缓存操作
+    procedure SetCache(Key: Text; Value: Text)
+    begin
+        if Cache.ContainsKey(Key) then
+            Cache.Remove(Key);
+            
+        Cache.Add(Key, Value);
+    end;
+    
+    procedure GetCache(Key: Text): Text
+    begin
+        if Cache.ContainsKey(Key) then
+            exit(Cache.Get(Key));
+        exit('');
+    end;
+}
+
+// 9. 临时表处理 Codeunit
+codeunit 50108 "Demo Temp Table Handler"
+{
+    // 9.1 临时表操作
+    procedure ProcessWithTempTable(var DemoHeader: Record "Demo Header")
+    var
+        TempDemoLine: Record "Demo Line" temporary;
+    begin
+        // 加载数据到临时表
+        LoadToTempTable(DemoHeader, TempDemoLine);
+        
+        // 处理临时表数据
+        if TempDemoLine.FindSet() then
+            repeat
+                ProcessTempLine(TempDemoLine);
+            until TempDemoLine.Next() = 0;
+    end;
+}
+
+// 10. 最佳实践
+/*
+1. 代码组织
+   - 相关功能分组
+   - 合理的过程命名
+   - 清晰的注释
+
+2. 错误处理
+   - 使用事务处理
+   - 适当的错误提示
+   - 日志记录
+
+3. 性能优化
+   - 使用临时表
+   - 批量处理
+   - 缓存管理
+
+4. 可扩展性
+   - 使用事件
+   - 模块化设计
+   - 参数化配置
+
+5. 安全性
+   - 权限控制
+   - 数据验证
+   - 安全日志
+*/
+
+// 11. 常用模式
+/*
+1. 单例模式
+2. 工厂模式
+3. 观察者模式
+4. 策略模式
+5. 命令模式
+*/
+
+// 12. 注意事项
+/*
+1. 事务处理
+2. 并发控制
+3. 内存管理
+4. 错误处理
+5. 性能优化
+6. 代码维护
+7. 安全性
+8. 可扩展性
+*/

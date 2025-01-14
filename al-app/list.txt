@@ -1,0 +1,315 @@
+// Business Central List 页面布局指南
+
+// 1. 基础列表页面结构
+page 50100 "Demo List Page"
+{
+    PageType = List;
+    ApplicationArea = All;
+    UsageCategory = Lists;
+    SourceTable = "Demo Table";
+    CardPageId = "Demo Card";
+    Editable = true;
+    
+    layout
+    {
+        area(Content)
+        {
+            // 1.1 基础字段显示
+            repeater(General)
+            {
+                field("No."; Rec."No.")
+                {
+                    ApplicationArea = All;
+                    StyleExpr = StyleText;  // 动态样式
+                    Visible = NoFieldVisible;  // 动态显示
+                    
+                    trigger OnDrillDown()
+                    begin
+                        ShowDetails();
+                    end;
+                }
+                
+                // 1.2 带格式的字段
+                field(Amount; Rec.Amount)
+                {
+                    ApplicationArea = All;
+                    AutoFormatType = 1;  // 自动格式化
+                    AutoFormatExpression = '<Precision,2:2><Standard Format,0>';
+                    Style = Strong;  // 固定样式
+                }
+                
+                // 1.3 FlowField 字段
+                field("Total Amount"; Rec."Total Amount")
+                {
+                    ApplicationArea = All;
+                    BlankZero = true;  // 零值显示为空
+                    DrillDown = true;  // 允许下钻
+                }
+            }
+            
+            // 1.4 固定组
+            group(Totals)
+            {
+                ShowCaption = false;
+                
+                field("Count"; TotalCount)
+                {
+                    ApplicationArea = All;
+                    Editable = false;
+                    Caption = '总数量';
+                }
+                
+                field("Sum"; TotalAmount)
+                {
+                    ApplicationArea = All;
+                    Editable = false;
+                    Caption = '总金额';
+                }
+            }
+        }
+        
+        // 2. 快速筛选区域
+        area(FactBoxes)
+        {
+            // 2.1 筛选框
+            part(FilterPane; "Power BI Report FactBox")
+            {
+                ApplicationArea = All;
+                Caption = '筛选';
+            }
+            
+            // 2.2 详情框
+            part(DetailsPart; "Demo Details FactBox")
+            {
+                ApplicationArea = All;
+                SubPageLink = "No." = field("No.");
+                UpdatePropagation = Both;  // 双向更新
+            }
+            
+            // 2.3 系统部件
+            systempart(Links; Links)
+            {
+                ApplicationArea = RecordLinks;
+            }
+            systempart(Notes; Notes)
+            {
+                ApplicationArea = Notes;
+            }
+        }
+    }
+    
+    // 3. 操作按钮区域
+    actions
+    {
+        // 3.1 导航区域
+        area(Navigation)
+        {
+            action(CardPage)
+            {
+                ApplicationArea = All;
+                Caption = '卡片';
+                Image = Card;
+                RunObject = Page "Demo Card";
+                RunPageLink = "No." = field("No.");
+                ShortcutKey = 'Shift+F7';
+            }
+        }
+        
+        // 3.2 处理区域
+        area(Processing)
+        {
+            group(Process)
+            {
+                Caption = '处理';
+                
+                action(New)
+                {
+                    ApplicationArea = All;
+                    Caption = '新建';
+                    Image = New;
+                    Promoted = true;
+                    PromotedCategory = New;
+                    PromotedOnly = true;
+                    
+                    trigger OnAction()
+                    begin
+                        CreateNew();
+                    end;
+                }
+                
+                action(Process)
+                {
+                    ApplicationArea = All;
+                    Caption = '处理';
+                    Image = Process;
+                    Enabled = HasSelected;  // 动态启用
+                    
+                    trigger OnAction()
+                    begin
+                        ProcessSelected();
+                    end;
+                }
+            }
+            
+            group(Print)
+            {
+                Caption = '打印';
+                
+                action(PrintList)
+                {
+                    ApplicationArea = All;
+                    Caption = '打印列表';
+                    Image = Print;
+                    Promoted = true;
+                    PromotedCategory = Report;
+                    
+                    trigger OnAction()
+                    begin
+                        PrintReport();
+                    end;
+                }
+            }
+        }
+        
+        // 3.3 相关项区域
+        area(Related)
+        {
+            action(RelatedItems)
+            {
+                ApplicationArea = All;
+                Caption = '相关项目';
+                RunObject = Page "Related Items";
+                RunPageLink = "Source No." = field("No.");
+            }
+        }
+    }
+    
+    // 4. 视图定义
+    views
+    {
+        view(Default)
+        {
+            Caption = '默认视图';
+            Filters = where(Status = const(New));
+            SharedLayout = true;
+        }
+        
+        view(Completed)
+        {
+            Caption = '已完成';
+            Filters = where(Status = const(Completed));
+            OrderBy = ascending(Amount);
+        }
+    }
+    
+    // 5. 页面触发器
+    trigger OnOpenPage()
+    begin
+        SetDefaultView();
+        UpdateTotals();
+    end;
+    
+    trigger OnAfterGetRecord()
+    begin
+        StyleText := GetStyleText();
+        UpdateFactBoxes();
+    end;
+    
+    trigger OnAfterGetCurrRecord()
+    begin
+        HasSelected := Rec."No." <> '';
+        EnableControls();
+    end;
+    
+    // 6. 辅助函数
+    local procedure EnableControls()
+    begin
+        ProcessEnabled := (Rec.Status = Rec.Status::New) and HasSelected;
+        NoFieldVisible := ShowNoField;
+    end;
+    
+    local procedure UpdateTotals()
+    var
+        DemoRec: Record "Demo Table";
+    begin
+        DemoRec.CalcSums(Amount);
+        TotalAmount := DemoRec.Amount;
+        TotalCount := DemoRec.Count;
+    end;
+    
+    local procedure GetStyleText(): Text
+    begin
+        case Rec.Status of
+            Rec.Status::Completed:
+                exit('Favorable');
+            Rec.Status::Processing:
+                exit('Attention');
+            else
+                exit('');
+        end;
+    end;
+    
+    // 7. 变量定义
+    var
+        [InDataSet]
+        StyleText: Text;
+        ProcessEnabled: Boolean;
+        HasSelected: Boolean;
+        NoFieldVisible: Boolean;
+        ShowNoField: Boolean;
+        TotalAmount: Decimal;
+        TotalCount: Integer;
+}
+
+// 8. 页面布局最佳实践
+/*
+1. 字段排列
+   - 重要字段靠前
+   - 相关字段分组
+   - 合理使用分隔符
+
+2. 操作按钮
+   - 常用操作提升显示
+   - 相关操作分组
+   - 使用合适的图标
+
+3. 视觉效果
+   - 使用样式突出重要信息
+   - 合理使用空间
+   - 保持一致性
+
+4. 性能考虑
+   - 避免过多计算字段
+   - 合理使用 FlowField
+   - 优化查询性能
+
+5. 用户体验
+   - 提供清晰的提示
+   - 合理的快捷键
+   - 直观的操作流程
+*/
+
+// 9. 常见样式
+/*
+Style 选项：
+- Standard (默认)
+- Strong (加粗)
+- Attention (警告)
+- Favorable (积极)
+- Unfavorable (消极)
+- Subordinate (次要)
+- AccentText (强调)
+*/
+
+// 10. 常用快捷键设置
+/*
+ShortcutKey 选项：
+- 'F5' (刷新)
+- 'F6' (下一部分)
+- 'F7' (卡片页)
+- 'F8' (复制)
+- 'Ctrl+F' (查找)
+- 'Ctrl+N' (新建)
+- 'Ctrl+D' (删除)
+- 'Ctrl+S' (保存)
+*/

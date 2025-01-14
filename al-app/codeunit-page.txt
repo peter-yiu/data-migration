@@ -1,0 +1,317 @@
+// Codeunit 使用演示页面
+
+page 50120 "Demo Codeunit Usage"
+{
+    PageType = Card;
+    Caption = 'Codeunit 使用演示';
+    UsageCategory = Administration;
+    ApplicationArea = All;
+    
+    layout
+    {
+        area(Content)
+        {
+            group(DocumentProcess)
+            {
+                Caption = '单据处理';
+                
+                field(DocumentNo; DocumentNo)
+                {
+                    Caption = '单据编号';
+                    ApplicationArea = All;
+                    
+                    trigger OnLookup(var Text: Text): Boolean
+                    begin
+                        LookupDocument();
+                    end;
+                }
+                
+                field(Amount; Amount)
+                {
+                    Caption = '金额';
+                    ApplicationArea = All;
+                    
+                    trigger OnValidate()
+                    begin
+                        // 使用工具 Codeunit 格式化金额
+                        FormattedAmount := DemoUtils.FormatAmount(Amount);
+                    end;
+                }
+                
+                field(FormattedAmount; FormattedAmount)
+                {
+                    Caption = '格式化金额';
+                    ApplicationArea = All;
+                    Editable = false;
+                }
+                
+                field(Email; Email)
+                {
+                    Caption = '邮箱';
+                    ApplicationArea = All;
+                    
+                    trigger OnValidate()
+                    begin
+                        // 使用工具 Codeunit 验证邮箱
+                        if not DemoUtils.ValidateEmail(Email) then
+                            Error('邮箱格式不正确');
+                    end;
+                }
+            }
+            
+            group(APITest)
+            {
+                Caption = 'API测试';
+                
+                field(APIEndpoint; APIEndpoint)
+                {
+                    Caption = 'API地址';
+                    ApplicationArea = All;
+                }
+                
+                field(APIPayload; APIPayload)
+                {
+                    Caption = '请求数据';
+                    ApplicationArea = All;
+                    MultiLine = true;
+                }
+                
+                field(APIResponse; APIResponse)
+                {
+                    Caption = '响应结果';
+                    ApplicationArea = All;
+                    MultiLine = true;
+                    Editable = false;
+                }
+            }
+            
+            group(Cache)
+            {
+                Caption = '缓存测试';
+                
+                field(CacheKey; CacheKey)
+                {
+                    Caption = '缓存键';
+                    ApplicationArea = All;
+                }
+                
+                field(CacheValue; CacheValue)
+                {
+                    Caption = '缓存值';
+                    ApplicationArea = All;
+                }
+            }
+        }
+    }
+    
+    actions
+    {
+        area(Processing)
+        {
+            action(ProcessDocument)
+            {
+                Caption = '处理单据';
+                ApplicationArea = All;
+                Image = Process;
+                
+                trigger OnAction()
+                begin
+                    ProcessSelectedDocument();
+                end;
+            }
+            
+            action(CallAPI)
+            {
+                Caption = '调用API';
+                ApplicationArea = All;
+                Image = SendTo;
+                
+                trigger OnAction()
+                begin
+                    CallExternalAPI();
+                end;
+            }
+            
+            action(SetCache)
+            {
+                Caption = '设置缓存';
+                ApplicationArea = All;
+                Image = Save;
+                
+                trigger OnAction()
+                begin
+                    // 使用缓存管理 Codeunit
+                    DemoCache.SetCache(CacheKey, CacheValue);
+                    Message('缓存已设置');
+                end;
+            }
+            
+            action(GetCache)
+            {
+                Caption = '获取缓存';
+                ApplicationArea = All;
+                Image = retrieve;
+                
+                trigger OnAction()
+                begin
+                    // 使用缓存管理 Codeunit
+                    CacheValue := DemoCache.GetCache(CacheKey);
+                    Message('缓存值: %1', CacheValue);
+                end;
+            }
+            
+            action(GenerateReport)
+            {
+                Caption = '生成报表';
+                ApplicationArea = All;
+                Image = Report;
+                
+                trigger OnAction()
+                begin
+                    GenerateDocumentReport();
+                end;
+            }
+        }
+    }
+    
+    var
+        DemoMgt: Codeunit "Demo Management";
+        DemoUtils: Codeunit "Demo Utilities";
+        DemoAPI: Codeunit "Demo API Integration";
+        DemoCache: Codeunit "Demo Cache Management";
+        DemoReport: Codeunit "Demo Report Management";
+        DocumentNo: Code[20];
+        Amount: Decimal;
+        FormattedAmount: Text;
+        Email: Text;
+        APIEndpoint: Text;
+        APIPayload: Text;
+        APIResponse: Text;
+        CacheKey: Text;
+        CacheValue: Text;
+    
+    local procedure ProcessSelectedDocument()
+    var
+        DemoHeader: Record "Demo Header";
+    begin
+        if DocumentNo = '' then
+            Error('请选择单据');
+            
+        if not DemoHeader.Get(DocumentNo) then
+            Error('单据不存在');
+            
+        // 使用业务处理 Codeunit
+        DemoMgt.ProcessDocument(DemoHeader);
+        Message('单据处理完成');
+    end;
+    
+    local procedure CallExternalAPI()
+    begin
+        if APIEndpoint = '' then
+            Error('请输入API地址');
+            
+        // 使用API集成 Codeunit
+        APIResponse := DemoAPI.CallExternalAPI(APIEndpoint, APIPayload);
+        Message('API调用完成');
+    end;
+    
+    local procedure GenerateDocumentReport()
+    var
+        DemoHeader: Record "Demo Header";
+        ReportData: Text;
+    begin
+        if not DemoHeader.Get(DocumentNo) then
+            Error('单据不存在');
+            
+        // 使用报表处理 Codeunit
+        ReportData := DemoReport.PrepareReportData(DemoHeader);
+        Message('报表数据: %1', ReportData);
+    end;
+    
+    local procedure LookupDocument()
+    var
+        DemoHeader: Record "Demo Header";
+        DemoList: Page "Demo List";
+    begin
+        DemoList.LookupMode(true);
+        if DemoList.RunModal() = Action::LookupOK then begin
+            DemoList.GetRecord(DemoHeader);
+            DocumentNo := DemoHeader."No.";
+        end;
+    end;
+    
+    trigger OnOpenPage()
+    begin
+        // 页面初始化逻辑
+    end;
+}
+
+// 使用说明
+/*
+此演示页面展示了如何在页面中使用各种类型的 Codeunit：
+
+1. 业务处理
+   - 单据处理
+   - 数据验证
+   - 业务规则执行
+
+2. 工具函数
+   - 格式化
+   - 验证
+   - 转换
+
+3. API集成
+   - 外部接口调用
+   - 数据交换
+   - 响应处理
+
+4. 缓存管理
+   - 数据缓存
+   - 缓存读取
+   - 缓存更新
+
+5. 报表处理
+   - 数据准备
+   - 报表生成
+   - 结果处理
+*/
+
+// 最佳实践
+/*
+1. Codeunit 调用
+   - 合理分配职责
+   - 避免循环依赖
+   - 注意性能影响
+
+2. 错误处理
+   - 适当的错误提示
+   - 事务处理
+   - 状态回滚
+
+3. 用户体验
+   - 清晰的提示
+   - 进度显示
+   - 结果确认
+
+4. 代码维护
+   - 清晰的结构
+   - 适当的注释
+   - 模块化设计
+*/ 
+
+
+这个示例页面展示了：
+如何在页面中集成各种类型的 Codeunit
+不同 Codeunit 的调用方式
+常见的业务场景实现
+用户界面交互处理
+错误处理机制
+最佳实践建议
+特点：
+完整的页面结构
+多种 Codeunit 使用示例
+实用的业务场景
+清晰的代码注释
+详细的使用说明
+最佳实践建议
+这个示例可以帮助开发者更好地理解如何在页面中使用 Codeunit。建议根据具体项目需求进行适当调整和扩展

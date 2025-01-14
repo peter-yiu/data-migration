@@ -1,0 +1,395 @@
+// Business Central 页面类型指南
+
+// 1. Document 类型页面
+page 50102 "Demo Document Page"
+{
+    PageType = Document;
+    SourceTable = "Demo Header";
+    
+    layout
+    {
+        area(Content)
+        {
+            group(General)
+            {
+                // 头部信息字段
+            }
+            
+            group(Lines)
+            {
+                part(Lines; "Demo Subform")
+                {
+                    ApplicationArea = All;
+                    SubPageLink = "Document No." = field("No.");
+                    UpdatePropagation = Both;
+                }
+            }
+        }
+    }
+}
+
+// 2. ListPart 类型页面（子页面）
+page 50103 "Demo Subform"
+{
+    PageType = ListPart;
+    SourceTable = "Demo Line";
+    AutoSplitKey = true;
+    
+    layout
+    {
+        area(Content)
+        {
+            repeater(Lines)
+            {
+                field("Line No."; Rec."Line No.")
+                {
+                    ApplicationArea = All;
+                    Visible = false;
+                }
+                
+                field(Type; Rec.Type)
+                {
+                    ApplicationArea = All;
+                }
+                
+                field(Description; Rec.Description)
+                {
+                    ApplicationArea = All;
+                }
+            }
+        }
+    }
+}
+
+// 3. Worksheet 类型页面
+page 50104 "Demo Worksheet"
+{
+    PageType = Worksheet;
+    SourceTable = "Demo Journal Line";
+    AutoSplitKey = true;
+    
+    layout
+    {
+        area(Content)
+        {
+            repeater(Lines)
+            {
+                // 日记账行字段
+            }
+            
+            group(Totals)
+            {
+                // 合计字段
+            }
+        }
+    }
+}
+
+// 4. ConfirmationDialog 类型页面
+page 50105 "Demo Confirmation Dialog"
+{
+    PageType = ConfirmationDialog;
+    Caption = '确认对话框';
+    
+    layout
+    {
+        area(Content)
+        {
+            group(Options)
+            {
+                field(Option1; Option1Enabled)
+                {
+                    ApplicationArea = All;
+                    Caption = '选项1';
+                }
+                
+                field(Option2; Option2Value)
+                {
+                    ApplicationArea = All;
+                    Caption = '选项2';
+                }
+            }
+        }
+    }
+    
+    var
+        Option1Enabled: Boolean;
+        Option2Value: Text;
+}
+
+// 5. NavigatePage 类型页面（向导）
+page 50106 "Demo Setup Wizard"
+{
+    PageType = NavigatePage;
+    Caption = '设置向导';
+    
+    layout
+    {
+        area(Content)
+        {
+            group(Step1)
+            {
+                Visible = Step = 1;
+                // 步骤1的字段
+            }
+            
+            group(Step2)
+            {
+                Visible = Step = 2;
+                // 步骤2的字段
+            }
+        }
+    }
+    
+    actions
+    {
+        area(Processing)
+        {
+            action(Back)
+            {
+                Enabled = Step > 1;
+                
+                trigger OnAction()
+                begin
+                    Step -= 1;
+                end;
+            }
+            
+            action(Next)
+            {
+                Enabled = Step < TotalSteps;
+                
+                trigger OnAction()
+                begin
+                    Step += 1;
+                end;
+            }
+            
+            action(Finish)
+            {
+                Visible = Step = TotalSteps;
+                
+                trigger OnAction()
+                begin
+                    FinishSetup();
+                end;
+            }
+        }
+    }
+    
+    var
+        Step: Integer;
+        TotalSteps: Integer;
+}
+
+// 6. API 类型页面
+page 50107 "Demo API Page"
+{
+    PageType = API;
+    APIPublisher = 'publisher';
+    APIGroup = 'group';
+    APIVersion = 'v1.0';
+    EntityName = 'entity';
+    EntitySetName = 'entities';
+    SourceTable = "Demo Table";
+    DelayedInsert = true;
+    
+    layout
+    {
+        area(Content)
+        {
+            repeater(General)
+            {
+                field(id; Rec."No.") { }
+                field(description; Rec.Description) { }
+            }
+        }
+    }
+}
+
+// 7. HeadlinePart 类型页面
+page 50108 "Demo Headline Part"
+{
+    PageType = HeadlinePart;
+    
+    layout
+    {
+        area(Content)
+        {
+            group(Headline)
+            {
+                field(Message; HeadlineText)
+                {
+                    ApplicationArea = All;
+                }
+            }
+        }
+    }
+    
+    var
+        HeadlineText: Text;
+}
+
+// 8. RoleCenter 类型页面
+page 50109 "Demo Role Center"
+{
+    PageType = RoleCenter;
+    
+    layout
+    {
+        area(RoleCenter)
+        {
+            part(Headline; "Demo Headline Part")
+            {
+                ApplicationArea = All;
+            }
+            
+            part(Activities; "Demo Activities Part")
+            {
+                ApplicationArea = All;
+            }
+            
+            part(Charts; "Demo Chart Part")
+            {
+                ApplicationArea = All;
+            }
+        }
+    }
+}
+
+// 9. CardPart 类型页面
+page 50110 "Demo Card Part"
+{
+    PageType = CardPart;
+    SourceTable = "Demo Table";
+    
+    layout
+    {
+        area(Content)
+        {
+            field("No."; Rec."No.")
+            {
+                ApplicationArea = All;
+            }
+            
+            field(Status; Rec.Status)
+            {
+                ApplicationArea = All;
+                StyleExpr = StatusStyle;
+            }
+        }
+    }
+}
+
+// 10. StandardDialog 类型页面
+page 50111 "Demo Standard Dialog"
+{
+    PageType = StandardDialog;
+    Caption = '标准对话框';
+    
+    layout
+    {
+        area(Content)
+        {
+            group(Options)
+            {
+                field(StartDate; StartDate)
+                {
+                    ApplicationArea = All;
+                    Caption = '开始日期';
+                }
+                
+                field(EndDate; EndDate)
+                {
+                    ApplicationArea = All;
+                    Caption = '结束日期';
+                }
+            }
+        }
+    }
+    
+    var
+        StartDate: Date;
+        EndDate: Date;
+}
+
+// 11. 页面类型说明
+/*
+1. Document
+   - 用于单据类型页面
+   - 通常包含头部和行项目
+   - 支持子页面
+
+2. ListPart
+   - 用作其他页面的子页面
+   - 通常用于显示行项目
+   - 支持自动编号
+
+3. Worksheet
+   - 用于日记账类型页面
+   - 支持批量输入和处理
+   - 通常包含合计信息
+
+4. ConfirmationDialog
+   - 用于确认操作
+   - 简单的选项设置
+   - 模态对话框
+
+5. NavigatePage
+   - 用于向导类型页面
+   - 支持多步骤操作
+   - 引导式用户体验
+
+6. API
+   - 用于Web API接口
+   - 支持外部系统集成
+   - 遵循OData协议
+
+7. HeadlinePart
+   - 用于显示提示信息
+   - 通常用在角色中心
+   - 支持动态内容
+
+8. RoleCenter
+   - 用户角色主页
+   - 集成多个部件
+   - 个性化工作区
+
+9. CardPart
+   - 用作快速查看部件
+   - 显示记录摘要信息
+   - 支持实时更新
+
+10. StandardDialog
+    - 标准对话框
+    - 用于简单的数据输入
+    - 模态显示
+*/
+
+// 12. 最佳实践
+/*
+1. 页面类型选择
+   - 根据业务需求选择
+   - 考虑用户体验
+   - 遵循标准模式
+
+2. 布局设计
+   - 合理组织内容
+   - 保持一致性
+   - 注重可用性
+
+3. 性能优化
+   - 减少不必要的更新
+   - 优化数据加载
+   - 合理使用缓存
+
+4. 用户体验
+   - 清晰的导航
+   - 及时的反馈
+   - 直观的操作
+*/ 
+
+
+
+
+4. ConfirmationDialog 类型页面
