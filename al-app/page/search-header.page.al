@@ -245,6 +245,13 @@ page 50101 "Search Header List"
         Client: Record Client;
         IsValid: Boolean;
     begin
+
+ // 只在未完成搜索的记录上执行验证
+    if Rec."Search Completed" then begin
+        ClientEntityNoStyle := '';  // 已完成搜索的记录不显示样式
+        exit;
+    end;
+
         if Rec."Client Entity No." = '' then begin
             ClientEntityNoStyle := '';
             exit;
