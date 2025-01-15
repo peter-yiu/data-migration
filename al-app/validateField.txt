@@ -1,0 +1,149 @@
+local procedure ValidateClientEntityNo()
+var
+    Entity: Record Entity;
+    Client: Record Client;
+    IsValid: Boolean;
+begin
+    if Rec."Client Entity No." = '' then begin
+        ClientEntityNoStyle := '';
+        exit;
+    end;
+
+    if CopyStr(Rec."Client Entity No.", 1, 2) = 'EN' then begin
+        // 方式1：使用 SetRange 精确匹配
+        Entity.SetRange("Search No.", Rec."Client Entity No.");  // 假设要查找的字段是 Search No.
+        IsValid := Entity.FindFirst();
+
+        // 方式2：使用 SetFilter 模糊匹配
+        // Entity.SetFilter("Search No.", '%1*', Rec."Client Entity No.");
+        // IsValid := Entity.FindFirst();
+
+        // 方式3：多字段组合查询
+        // Entity.SetRange("Search No.", Rec."Client Entity No.");
+        // Entity.SetRange("Type", Entity.Type::Customer);
+        // IsValid := Entity.FindFirst();
+
+        // 方式4：使用 UPPERCASE 不区分大小写查询
+        // Entity.SetRange(UPPERCASE("Search No."), UPPERCASE(Rec."Client Entity No."));
+        // IsValid := Entity.FindFirst();
+    end else begin
+        // Client 表查询示例
+        Client.SetRange("Search No.", Rec."Client Entity No.");
+        IsValid := Client.FindFirst();
+    end;
+
+    // 设置样式
+    ClientEntityNoStyle := if(IsValid, '', 'Unfavorable');
+    
+    // 更新页面
+    CurrPage.Update(false);
+end;
+
+// 在批量处理中的应用
+local procedure ProcessBatchSearch()
+var
+    SearchHeader: Record "Search Header";
+    Entity: Record Entity;
+    Client: Record Client;
+    ErrorList: List of [Text];
+    SearchText: Text;
+begin
+    // ... 其他代码 ...
+
+    if SearchHeader.FindSet() then begin
+        repeat
+            if SearchHeader."Client Entity No." <> '' then begin
+                if CopyStr(SearchHeader."Client Entity No.", 1, 2) = 'EN' then begin
+                    // 使用非主键字段查询 Entity
+                    Entity.Reset();
+                    Entity.SetRange("Search No.", SearchHeader."Client Entity No.");
+                    if not Entity.FindFirst() then begin
+                        ErrorList.Add(
+                            StrSubstNo(
+                                '编号 %1 在 Entity 表中未找到匹配记录', 
+                                SearchHeader."Client Entity No."
+                            )
+                        );
+                        continue;
+                    end;
+                    SearchText := Entity.FormalName;
+                end else begin
+                    // 使用非主键字段查询 Client
+                    Client.Reset();
+                    Client.SetRange("Search No.", SearchHeader."Client Entity No.");
+                    if not Client.FindFirst() then begin
+                        ErrorList.Add(
+                            StrSubstNo(
+                                '编号 %1 在 Client 表中未找到匹配记录', 
+                                SearchHeader."Client Entity No."
+                            )
+                        );
+                        continue;
+                    end;
+                    SearchText := Client.FormalName;
+                end;
+            end else begin
+                // ... 默认搜索文本处理 ...
+            end;
+        until SearchHeader.Next() = 0;
+    end;
+
+    // ... 其他代码 ...
+end;
+
+// 如果需要创建索引来优化查询性能，在表定义中：
+table 50102 "Entity"
+{
+    fields
+    {
+        field(1; "No."; Code[20])
+        {
+            Caption = 'No.';
+        }
+        field(2; "Search No."; Code[20])
+        {
+            Caption = 'Search No.';
+        }
+        field(3; "FormalName"; Text[100])
+        {
+            Caption = 'Formal Name';
+        }
+        // ... 其他字段
+    }
+    
+    keys
+    {
+        key(PK; "No.")
+        {
+            Clustered = true;
+        }
+        // 为查询字段创建索引
+        key(SK1; "Search No.")
+        {
+        }
+        // 多字段组合索引
+        key(SK2; "Search No.", "Type")
+        {
+        }
+    }
+}
+
+
+
+主要的查找方式包括：
+精确匹配
+使用 SetRange 设置精确的查找条件
+使用 FindFirst 获取第一个匹配记录
+模糊匹配
+使用 SetFilter 设置带通配符的查找条件
+支持更复杂的匹配模式
+多字段组合查询
+可以同时设置多个字段的查找条件
+使用多个 SetRange/SetFilter
+不区分大小写查询
+使用 UPPERCASE 函数进行不区分大小写的查询
+性能优化
+为经常查询的字段创建索引
+使用适当的查询方式
+注意重置记录集（使用 Reset）
+这样的实现更灵活，可以根据实际需求选择合适的查找方式。
