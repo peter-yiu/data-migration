@@ -147,3 +147,133 @@ table 50102 "Entity"
 使用适当的查询方式
 注意重置记录集（使用 Reset）
 这样的实现更灵活，可以根据实际需求选择合适的查找方式。
+
+// FindFirst() 的基本用法示例
+local procedure ExplainFindFirst()
+var
+    Entity: Record Entity;
+    Found: Boolean;
+begin
+    // 1. 基本用法
+    Entity.SetRange("Search No.", 'EN001');  // 设置筛选条件
+    Found := Entity.FindFirst();  // 查找第一条匹配记录
+    // Found 为 true 表示找到记录，false 表示未找到
+    // 如果找到，Entity 变量中就包含了找到的记录数据
+
+    // 2. 直接使用返回值
+    if Entity.FindFirst() then begin
+        // 找到记录，可以使用 Entity 的字段
+        Message('找到记录：%1', Entity.FormalName);
+    end else begin
+        // 未找到记录
+        Message('未找到匹配记录');
+    end;
+
+    // 3. 与 FindSet 的区别
+    // FindFirst: 只查找第一条记录
+    if Entity.FindFirst() then
+        ProcessSingleRecord(Entity);
+
+    // FindSet: 查找所有匹配记录
+    if Entity.FindSet() then begin
+        repeat
+            ProcessMultipleRecords(Entity);
+        until Entity.Next() = 0;
+    end;
+end;
+
+// FindFirst 常见用法示例
+local procedure CommonUsages()
+var
+    Entity: Record Entity;
+begin
+    // 1. 检查记录是否存在
+    Entity.SetRange("Search No.", 'EN001');
+    if not Entity.FindFirst() then
+        Error('记录不存在');
+
+    // 2. 获取单条记录数据
+    Entity.SetRange("Type", Entity.Type::Customer);
+    Entity.SetRange("Status", Entity.Status::Active);
+    if Entity.FindFirst() then begin
+        // 使用找到的记录数据
+        ProcessRecord(Entity);
+    end;
+
+    // 3. 组合条件查询
+    Entity.Reset();  // 清除之前的筛选
+    Entity.SetRange("Type", Entity.Type::Customer);
+    Entity.SetFilter("Amount", '>%1', 1000);
+    Entity.SetRange("Date", WorkDate());
+    if Entity.FindFirst() then begin
+        // 处理满足所有条件的第一条记录
+    end;
+
+    // 4. 带排序的查找
+    Entity.Reset();
+    Entity.SetCurrentKey("Date");  // 设置排序键
+    Entity.Ascending(false);  // 降序排列
+    if Entity.FindFirst() then begin
+        // 获取最新的记录
+    end;
+end;
+
+// 性能考虑示例
+local procedure PerformanceConsiderations()
+var
+    Entity: Record Entity;
+begin
+    // 1. 使用索引字段
+    Entity.SetCurrentKey("Search No.");  // 使用索引字段查询性能更好
+    Entity.SetRange("Search No.", 'EN001');
+    Entity.FindFirst();
+
+    // 2. 避免重复查询
+    if Entity.FindFirst() then begin
+        // 将需要的数据保存到变量中
+        LastProcessedNo := Entity."No.";
+        LastProcessedName := Entity.FormalName;
+    end;
+
+    // 3. 使用临时表优化
+    TempEntity.Reset();
+    TempEntity.DeleteAll();
+    
+    if Entity.FindSet() then begin
+        repeat
+            if QualifyForProcess(Entity) then begin
+                TempEntity := Entity;
+                TempEntity.Insert();
+            end;
+        until Entity.Next() = 0;
+    end;
+end;
+
+
+
+
+`FindFirst()` 的主要特点：
+
+功能
+查找满足当前筛选条件的第一条记录
+返回布尔值表示是否找到记录
+如果找到，记录数据会加载到变量中
+使用场景
+检查记录是否存在
+获取单条记录数据
+验证数据有效性
+简单的记录查找
+与其他方法的区别
+FindFirst(): 只查找第一条记录
+FindSet(): 查找所有匹配记录，用于遍历
+Get(): 通过主键查找特定记录
+性能考虑
+使用索引字段查询效率更高
+避免在循环中重复查询
+合理使用筛选条件
+最佳实践
+查询前先 Reset 清除之前的筛选
+使用适当的索引字段
+注意错误处理
+考虑并发访问情况
+
