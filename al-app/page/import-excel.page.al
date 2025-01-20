@@ -25,6 +25,65 @@ codeunit 50100 "Excel Import Management"
         ProcessExcelData(TempExcelBuffer);
     end;
 
+    local procedure GetExcelValue(var TempExcelBuffer: Record "Excel Buffer" temporary; 
+        RowNo: Integer; ColNo: Integer; var TargetField: Text)
+    begin
+        TempExcelBuffer.Reset();
+        TempExcelBuffer.SetRange("Row No.", RowNo);
+        TempExcelBuffer.SetRange("Column No.", ColNo);
+        if TempExcelBuffer.FindFirst() then
+            TargetField := TempExcelBuffer."Cell Value as Text"
+        else
+            TargetField := '';
+    end;
+
+    // 新增：获取Excel日期值
+    local procedure GetExcelDateValue(var TempExcelBuffer: Record "Excel Buffer" temporary; 
+        RowNo: Integer; ColNo: Integer): Date
+    var
+        DateValue: Date;
+        DateText: Text;
+    begin
+        TempExcelBuffer.Reset();
+        TempExcelBuffer.SetRange("Row No.", RowNo);
+        TempExcelBuffer.SetRange("Column No.", ColNo);
+        if TempExcelBuffer.FindFirst() then begin
+            // 首先尝试使用Excel的日期值
+            if TempExcelBuffer."Cell Value as Date" <> 0D then
+                exit(TempExcelBuffer."Cell Value as Date");
+
+            // 如果不是Excel日期，尝试转换文本
+            DateText := TempExcelBuffer."Cell Value as Text";
+            if TryConvertToDate(DateText, DateValue) then
+                exit(DateValue);
+        end;
+        exit(0D);
+    end;
+
+    // 新增：日期转换方法
+    local procedure TryConvertToDate(DateText: Text; var DateValue: Date): Boolean
+    var
+        DateFormatList: List of [Text];
+        DateFormat: Text;
+    begin
+        // 初始化支持的日期格式列表
+        DateFormatList.Add('<Day,2>/<Month,2>/<Year4>');
+        DateFormatList.Add('<Year4>-<Month,2>-<Day,2>');
+        DateFormatList.Add('<Month,2>/<Day,2>/<Year4>');
+        DateFormatList.Add('<Day,2>-<Month,2>-<Year4>');
+
+        // 尝试直接转换
+        if Evaluate(DateValue, DateText) then
+            exit(true);
+
+        // 尝试不同的日期格式
+        foreach DateFormat in DateFormatList do
+            if Evaluate(DateValue, DateText, DateFormat) then
+                exit(true);
+
+        exit(false);
+    end;
+
     local procedure ProcessExcelData(var TempExcelBuffer: Record "Excel Buffer" temporary)
     var
         ImportedData: Record "Imported Excel Data";
@@ -37,6 +96,7 @@ codeunit 50100 "Excel Import Management"
         ErrorLog: Text;
         SuccessCount: Integer;
         ErrorCount: Integer;
+        ImportDate: Date;
     begin
         // 获取最后一个批次号
         if ImportedData.FindLast() then
@@ -66,7 +126,17 @@ codeunit 50100 "Excel Import Management"
             if not ValidateAndAssignRowData(TempExcelBuffer, RowNo, TempImportedData, ErrorLog) then begin
                 ErrorCount += 1;
                 ErrorLog += StrSubstNo('行号 %1: 数据验证失败\', RowNo);
+                continue;
             end;
+
+            // 获取日期字段（假设在第6列）
+            ImportDate := GetExcelDateValue(TempExcelBuffer, RowNo, 6);
+            if ImportDate = 0D then begin
+                ErrorCount += 1;
+                ErrorLog += StrSubstNo('行号 %1: 日期格式无效\', RowNo);
+                continue;
+            end;
+            TempImportedData."Import Date" := ImportDate;
             
             // 如果验证通过，保存到临时表
             if ErrorCount = 0 then begin
@@ -107,6 +177,7 @@ codeunit 50100 "Excel Import Management"
     var
         TypeText: Text;
         IsValid: Boolean;
+        ImportDate: Date;
     begin
         IsValid := true;
 
@@ -143,6 +214,14 @@ codeunit 50100 "Excel Import Management"
             ErrorLog += StrSubstNo('行号 %1: 护照号码不能为空\', RowNo);
             IsValid := false;
         end;
+
+        // 验证日期（假设在第6列）
+        ImportDate := GetExcelDateValue(TempExcelBuffer, RowNo, 6);
+        if ImportDate = 0D then begin
+            ErrorLog += StrSubstNo('行号 %1: 日期格式无效\', RowNo);
+            IsValid := false;
+        end else
+            ImportedData."Import Date" := ImportDate;
 
         exit(IsValid);
     end;
