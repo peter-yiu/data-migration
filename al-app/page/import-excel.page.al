@@ -108,6 +108,7 @@ codeunit 50100 "Excel Import Management"
         ErrorCount: Integer;
         ImportDate: Date;
         IsDateEmpty: Boolean;
+        IsGenderEmpty: Boolean;
     begin
         // 获取最后一个批次号
         if ImportedData.FindLast() then
@@ -140,6 +141,9 @@ codeunit 50100 "Excel Import Management"
                 continue;
             end;
 
+            // 处理性别字段（假设在第7列）
+            TempImportedData.Gender := GetExcelGenderOption(TempExcelBuffer, RowNo, 7, IsGenderEmpty);
+            
             // 获取日期字段（假设在第6列）
             ImportDate := GetExcelDateValue(TempExcelBuffer, RowNo, 6, IsDateEmpty);
             if not IsDateEmpty and (ImportDate = 0D) then begin
@@ -190,6 +194,7 @@ codeunit 50100 "Excel Import Management"
         IsValid: Boolean;
         ImportDate: Date;
         IsDateEmpty: Boolean;
+        IsGenderEmpty: Boolean;
     begin
         IsValid := true;
 
@@ -238,6 +243,19 @@ codeunit 50100 "Excel Import Management"
         end else
             ImportedData."Import Date" := 0D;  // 设置为空日期
 
+        // 验证性别（假设在第7列）
+        ImportedData.Gender := GetExcelGenderOption(TempExcelBuffer, RowNo, 7, IsGenderEmpty);
+        if not IsGenderEmpty then begin
+            // 如果不为空但值无效（既不是Male也不是Female）
+            if (ImportedData.Gender <> ImportedData.Gender::Male) and 
+               (ImportedData.Gender <> ImportedData.Gender::Female) then 
+            begin
+                ErrorLog += StrSubstNo('行号 %1: 性别值无效，必须是 Male 或 Female\', RowNo);
+                IsValid := false;
+            end;
+        end;
+        // 如果为空，Gender字段已经被设置为" "（空选项）
+
         exit(IsValid);
     end;
 
@@ -252,7 +270,48 @@ codeunit 50100 "Excel Import Management"
         else
             TargetField := '';
     end;
+
+    // 添加性别选项的枚举处理
+    local procedure GetExcelGenderOption(var TempExcelBuffer: Record "Excel Buffer" temporary; 
+        RowNo: Integer; ColNo: Integer; var IsEmpty: Boolean): Option " ",Male,Female
+    var
+        GenderText: Text;
+    begin
+        IsEmpty := false;
+        
+        TempExcelBuffer.Reset();
+        TempExcelBuffer.SetRange("Row No.", RowNo);
+        TempExcelBuffer.SetRange("Column No.", ColNo);
+        if TempExcelBuffer.FindFirst() then begin
+            GenderText := TempExcelBuffer."Cell Value as Text";
+            GenderText := DelChr(GenderText, '<>', ' '); // 移除前后空格
+            
+            // 检查是否为空
+            if GenderText = '' then begin
+                IsEmpty := true;
+                exit(" ");  // 返回空选项
+            end;
+            
+            // 转换为大写进行比较
+            case UpperCase(GenderText) of
+                'MALE':
+                    exit(Male);
+                'FEMALE':
+                    exit(Female);
+                else
+                    exit(" ");  // 无法识别的值返回空选项
+            end;
+        end else begin
+            IsEmpty := true;
+            exit(" ");
+        end;
+    end;
 }
 
-
+//field(FieldNo; Gender)
+//{
+//    Caption = 'Gender';
+//    OptionMembers = " ",Male,Female;
+//    OptionCaption = ' ,Male,Female';
+//}
 
