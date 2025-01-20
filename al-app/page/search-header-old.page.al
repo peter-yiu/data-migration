@@ -84,73 +84,24 @@ page 50101 "Search Header List"
     local procedure ProcessSearch()
     var
         SearchHeader: Record "Search Header";
-        Entity: Record Entity;
-        ParticularsHistory: Record "Particulars History";
         SearchText: Text;
-        ErrorList: List of [Text];
     begin
         SearchHeader.Reset();
         SearchHeader.SetRange(Status, true);  
         
         if SearchHeader.FindSet() then begin
             repeat
-                // 1. 检查 Entity No.
-                if SearchHeader."Entity No." <> '' then begin
-                    // 匹配 Entity 表
-                    if not Entity.Get(SearchHeader."Entity No.") then begin
-                        ErrorList.Add(StrSubstNo('编号 %1 在 Entity 表中未找到匹配记录', SearchHeader."Entity No."));
-                        continue;
-                    end;
-                    
-                    // 使用当前 Formal Name 搜索
-                    SearchText := Entity.FormalName;
-                    if SearchText <> '' then
-                        ProcessSearchText(SearchText);
-
-                    // 搜索历史名称
-                    ParticularsHistory.Reset();
-                    ParticularsHistory.SetRange("No.", SearchHeader."Entity No.");
-                    ParticularsHistory.SetRange("Change Type", ParticularsHistory."Change Type"::Name);
-                    if ParticularsHistory.FindSet() then begin
-                        repeat
-                            if ParticularsHistory."Old Formal Name" <> '' then
-                                ProcessSearchText(ParticularsHistory."Old Formal Name");
-                        until ParticularsHistory.Next() = 0;
-                    end;
-                end else begin
-                    // 3. Entity No. 为空时的处理
-                    if SearchHeader."Company Name" <> '' then begin
-                        // 3.1 Company Name 不为空
-                        if SearchHeader."Company Name" <> '' then
-                            ProcessSearchText(SearchHeader."Company Name");
-                        
-                        if SearchHeader."Previous Name" <> '' then
-                            ProcessSearchText(SearchHeader."Previous Name");
-                            
-                        if SearchHeader."Alias Name" <> '' then
-                            ProcessSearchText(SearchHeader."Alias Name");
-                    end else begin
-                        // 3.2 Company Name 为空
-                        if (SearchHeader."First Name" <> '') or (SearchHeader."Last Name" <> '') then
-                            ProcessSearchText(DelChr(StrSubstNo('%1 %2', 
-                                SearchHeader."First Name", 
-                                SearchHeader."Last Name"
-                            ), '<>', ' '));
-                            
-                        if SearchHeader."Previous Name" <> '' then
-                            ProcessSearchText(SearchHeader."Previous Name");
-                            
-                        if SearchHeader."Alias Name" <> '' then
-                            ProcessSearchText(SearchHeader."Alias Name");
-                    end;
-                end;
+                SearchText := DelChr(
+                    StrSubstNo('%1 %2 %3',
+                        SearchHeader."Company Name",
+                        SearchHeader."First Name",
+                        SearchHeader."Last Name"
+                    ), '<>', ' '
+                );
+                
+                if SearchText <> '' then
+                    ProcessSearchText(SearchText);
             until SearchHeader.Next() = 0;
-        end;
-
-        // 检查是否有错误
-        if not ErrorList.IsEmpty then begin
-            ShowErrorList(ErrorList);
-            exit;
         end;
     end;
 
@@ -184,63 +135,52 @@ page 50101 "Search Header List"
     local procedure ProcessBatchSearch()
     var
         SearchHeader: Record "Search Header";
-        Entity: Record Entity;
-        ParticularsHistory: Record "Particulars History";
+        ScrutinyMgt: Codeunit "Scrutiny Management";
+        SearchParameters: Record "Scrutiny Parameters" temporary;
+        SearchResult: Record "Scrutiny Search Result" temporary;
         SearchTexts: List of [Text];
         SearchText: Text;
+        Entity: Record Entity;
+        Client: Record Client;
         ErrorList: List of [Text];
     begin
         SearchHeader.Reset();
         SearchHeader.SetRange(Status, true);  
         
-        // 收集所有搜索文本
+        // 第一步：收集所有搜索文本
         if SearchHeader.FindSet() then begin
             repeat
-                if SearchHeader."Entity No." <> '' then begin
-                    // 匹配 Entity 表
-                    if not Entity.Get(SearchHeader."Entity No.") then begin
-                        ErrorList.Add(StrSubstNo('编号 %1 在 Entity 表中未找到匹配记录', SearchHeader."Entity No."));
-                        continue;
-                    end;
-                    
-                    // 添加当前 Formal Name
-                    if Entity.FormalName <> '' then
-                        SearchTexts.Add(Entity.FormalName);
-
-                    // 添加历史名称
-                    ParticularsHistory.Reset();
-                    ParticularsHistory.SetRange("No.", SearchHeader."Entity No.");
-                    ParticularsHistory.SetRange("Change Type", ParticularsHistory."Change Type"::Name);
-                    if ParticularsHistory.FindSet() then begin
-                        repeat
-                            if ParticularsHistory."Old Formal Name" <> '' then
-                                SearchTexts.Add(ParticularsHistory."Old Formal Name");
-                        until ParticularsHistory.Next() = 0;
+                // 根据 ClientEntityNo 获取 FormalName
+                SearchText := '';
+                if SearchHeader."Client Entity No." <> '' then begin
+                    if CopyStr(SearchHeader."Client Entity No.", 1, 2) = 'EN' then begin
+                        // 检查 Entity 表
+                        if not Entity.Get(SearchHeader."Client Entity No.") then begin
+                            ErrorList.Add(StrSubstNo('编号 %1 在 Entity 表中未找到匹配记录', SearchHeader."Client Entity No."));
+                            continue;
+                        end;
+                        SearchText := Entity.FormalName;
+                    end else begin
+                        // 检查 Client 表
+                        if not Client.Get(SearchHeader."Client Entity No.") then begin
+                            ErrorList.Add(StrSubstNo('编号 %1 在 Client 表中未找到匹配记录', SearchHeader."Client Entity No."));
+                            continue;
+                        end;
+                        SearchText := Client.FormalName;
                     end;
                 end else begin
-                    if SearchHeader."Company Name" <> '' then begin
-                        if SearchHeader."Company Name" <> '' then
-                            SearchTexts.Add(SearchHeader."Company Name");
-                        
-                        if SearchHeader."Previous Name" <> '' then
-                            SearchTexts.Add(SearchHeader."Previous Name");
-                            
-                        if SearchHeader."Alias Name" <> '' then
-                            SearchTexts.Add(SearchHeader."Alias Name");
-                    end else begin
-                        if (SearchHeader."First Name" <> '') or (SearchHeader."Last Name" <> '') then
-                            SearchTexts.Add(DelChr(StrSubstNo('%1 %2', 
-                                SearchHeader."First Name", 
-                                SearchHeader."Last Name"
-                            ), '<>', ' '));
-                            
-                        if SearchHeader."Previous Name" <> '' then
-                            SearchTexts.Add(SearchHeader."Previous Name");
-                            
-                        if SearchHeader."Alias Name" <> '' then
-                            SearchTexts.Add(SearchHeader."Alias Name");
-                    end;
+                    // Client Entity No. 为空时使用默认组合
+                    SearchText := DelChr(
+                        StrSubstNo('%1 %2 %3',
+                            SearchHeader."Company Name",
+                            SearchHeader."First Name",
+                            SearchHeader."Last Name"
+                        ), '<>', ' '
+                    );
                 end;
+                
+                if SearchText <> '' then
+                    SearchTexts.Add(SearchText);
             until SearchHeader.Next() = 0;
         end;
 
@@ -250,9 +190,24 @@ page 50101 "Search Header List"
             exit;
         end;
 
-        // 执行批量搜索
+        // 第二步：批量搜索
         if not SearchTexts.IsEmpty then begin
-            ProcessBatchSearchTexts(SearchTexts);
+            SearchParameters.Init();
+            SearchParameters."Min. Score" := 0.7;
+            SearchParameters."Max. Results" := 1000;
+            
+            ScrutinyMgt.SearchMultiple(
+                SearchTexts,
+                SearchParameters,
+                SearchResult
+            );
+
+            if SearchResult.FindSet() then begin
+                repeat
+                    ProcessScrutinyResult(SearchResult);
+                until SearchResult.Next() = 0;
+            end;
+
             Message('批量搜索完成，共处理 %1 个搜索文本', SearchTexts.Count);
         end;
     end;
