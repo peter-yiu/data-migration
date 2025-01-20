@@ -37,17 +37,25 @@ codeunit 50100 "Excel Import Management"
             TargetField := '';
     end;
 
-    // 新增：获取Excel日期值
+    // 修改：获取Excel日期值，支持空值
     local procedure GetExcelDateValue(var TempExcelBuffer: Record "Excel Buffer" temporary; 
-        RowNo: Integer; ColNo: Integer): Date
+        RowNo: Integer; ColNo: Integer; var IsEmpty: Boolean): Date
     var
         DateValue: Date;
         DateText: Text;
     begin
+        IsEmpty := false; // 初始化空值标志
+        
         TempExcelBuffer.Reset();
         TempExcelBuffer.SetRange("Row No.", RowNo);
         TempExcelBuffer.SetRange("Column No.", ColNo);
         if TempExcelBuffer.FindFirst() then begin
+            // 检查单元格是否为空
+            if TempExcelBuffer."Cell Value as Text" = '' then begin
+                IsEmpty := true;
+                exit(0D);
+            end;
+
             // 首先尝试使用Excel的日期值
             if TempExcelBuffer."Cell Value as Date" <> 0D then
                 exit(TempExcelBuffer."Cell Value as Date");
@@ -56,6 +64,8 @@ codeunit 50100 "Excel Import Management"
             DateText := TempExcelBuffer."Cell Value as Text";
             if TryConvertToDate(DateText, DateValue) then
                 exit(DateValue);
+        end else begin
+            IsEmpty := true;
         end;
         exit(0D);
     end;
@@ -97,6 +107,7 @@ codeunit 50100 "Excel Import Management"
         SuccessCount: Integer;
         ErrorCount: Integer;
         ImportDate: Date;
+        IsDateEmpty: Boolean;
     begin
         // 获取最后一个批次号
         if ImportedData.FindLast() then
@@ -130,13 +141,13 @@ codeunit 50100 "Excel Import Management"
             end;
 
             // 获取日期字段（假设在第6列）
-            ImportDate := GetExcelDateValue(TempExcelBuffer, RowNo, 6);
-            if ImportDate = 0D then begin
+            ImportDate := GetExcelDateValue(TempExcelBuffer, RowNo, 6, IsDateEmpty);
+            if not IsDateEmpty and (ImportDate = 0D) then begin
                 ErrorCount += 1;
                 ErrorLog += StrSubstNo('行号 %1: 日期格式无效\', RowNo);
                 continue;
             end;
-            TempImportedData."Import Date" := ImportDate;
+            TempImportedData."Import Date" := ImportDate;  // 如果IsDateEmpty为true，这里会设置为0D
             
             // 如果验证通过，保存到临时表
             if ErrorCount = 0 then begin
@@ -178,6 +189,7 @@ codeunit 50100 "Excel Import Management"
         TypeText: Text;
         IsValid: Boolean;
         ImportDate: Date;
+        IsDateEmpty: Boolean;
     begin
         IsValid := true;
 
@@ -216,12 +228,15 @@ codeunit 50100 "Excel Import Management"
         end;
 
         // 验证日期（假设在第6列）
-        ImportDate := GetExcelDateValue(TempExcelBuffer, RowNo, 6);
-        if ImportDate = 0D then begin
-            ErrorLog += StrSubstNo('行号 %1: 日期格式无效\', RowNo);
-            IsValid := false;
+        ImportDate := GetExcelDateValue(TempExcelBuffer, RowNo, 6, IsDateEmpty);
+        if not IsDateEmpty then begin
+            if ImportDate = 0D then begin
+                ErrorLog += StrSubstNo('行号 %1: 日期格式无效\', RowNo);
+                IsValid := false;
+            end else
+                ImportedData."Import Date" := ImportDate;
         end else
-            ImportedData."Import Date" := ImportDate;
+            ImportedData."Import Date" := 0D;  // 设置为空日期
 
         exit(IsValid);
     end;
