@@ -9,6 +9,37 @@ page 50101 "Search Header List"
     {
         area(Content)
         {
+            group(Filters)
+            {
+                Caption = '筛选';
+                
+                field(BatchNoFilter; BatchNoFilter)
+                {
+                    ApplicationArea = All;
+                    Caption = '批次号';
+                    ToolTip = '可以输入批次号进行筛选，留空显示未分配批次的记录';
+                    
+                    trigger OnValidate()
+                    begin
+                        ValidateAndApplyBatchFilter();
+                    end;
+                }
+                
+                field(ClearFilters; ClearFiltersLbl)
+                {
+                    ApplicationArea = All;
+                    Caption = '清除筛选';
+                    Editable = false;
+                    ShowCaption = false;
+                    ToolTip = '点击显示所有记录';
+                    
+                    trigger OnDrillDown()
+                    begin
+                        ClearBatchFilter();
+                    end;
+                }
+            }
+            
             repeater(GroupName)
             {
                 field("Entry No."; Rec."Entry No.")
@@ -50,6 +81,33 @@ page 50101 "Search Header List"
     {
         area(Processing)
         {
+            action(ShowEmptyBatch)
+            {
+                ApplicationArea = All;
+                Caption = '显示未分配批次';
+                Image = FilterLines;
+                Promoted = true;
+                PromotedCategory = Process;
+                
+                trigger OnAction()
+                begin
+                    FilterEmptyBatch();
+                end;
+            }
+            
+            action(ShowAllRecords)
+            {
+                ApplicationArea = All;
+                Caption = '显示所有记录';
+                Image = ClearFilter;
+                Promoted = true;
+                PromotedCategory = Process;
+                
+                trigger OnAction()
+                begin
+                    ClearBatchFilter();
+                end;
+            }
             action(Search)
             {
                 ApplicationArea = All;
@@ -283,6 +341,8 @@ page 50101 "Search Header List"
     var
         [InDataSet]
         ClientEntityNoStyle: Text;
+        BatchNoFilter: Text;
+        ClearFiltersLbl: Label '清除筛选';
 
     local procedure ValidateClientEntityNo()
     var
@@ -320,5 +380,37 @@ page 50101 "Search Header List"
     trigger OnAfterGetRecord()
     begin
         ValidateClientEntityNo();
+    end;
+
+    trigger OnOpenPage()
+    begin
+        // 页面加载时默认筛选 Batch No. 为空的记录
+        FilterEmptyBatch();
+    end;
+    
+    local procedure ValidateAndApplyBatchFilter()
+    begin
+        if BatchNoFilter <> '' then begin
+            Rec.Reset();
+            Rec.SetFilter("Batch No.", BatchNoFilter);
+        end else
+            FilterEmptyBatch();
+            
+        CurrPage.Update(false);
+    end;
+    
+    local procedure FilterEmptyBatch()
+    begin
+        Rec.Reset();
+        Rec.SetFilter("Batch No.", '%1', '');  // 筛选 Batch No. 为空的记录
+        BatchNoFilter := '';
+        CurrPage.Update(false);
+    end;
+    
+    local procedure ClearBatchFilter()
+    begin
+        Rec.Reset();
+        BatchNoFilter := '';
+        CurrPage.Update(false);
     end;
 } 
