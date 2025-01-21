@@ -205,10 +205,206 @@ page.on('response', response => {
 
 
 
+#!/usr/bin/env pwsh
+
+<#
+.SYNOPSIS
+运行 BC-Replay 测试的便捷脚本。
+
+.DESCRIPTION
+此脚本用于简化 BC-Replay 测试的执行过程，支持配置文件和命令行参数。
+
+.PARAMETER ConfigFile
+(可选) 配置文件的路径，默认为 "./bc-replay.config.json"
+
+.PARAMETER Recording
+(可选) 指定要运行的录制文件，如果不指定则运行配置文件中定义的所有录制文件
+
+.PARAMETER StartAddress
+(可选) 覆盖配置文件中的 startAddress
+
+.PARAMETER ResultDir
+(可选) 覆盖配置文件中的 resultDir
+
+.PARAMETER Username
+(可选) Business Central 用户名
+
+.PARAMETER Password
+(可选) Business Central 密码
+#>
+
+param (
+    [Parameter()]
+    [string]
+    $ConfigFile = "./bc-replay.config.json",
+
+    [Parameter()]
+    [string]
+    $Recording,
+
+    [Parameter()]
+    [string]
+    $StartAddress,
+
+    [Parameter()]
+    [string]
+    $ResultDir,
+
+    [Parameter()]
+    [string]
+    $Username,
+
+    [Parameter()]
+    [string]
+    $Password
+)
+
+# 错误处理
+$ErrorActionPreference = "Stop"
+
+function Write-Log {
+    param([string]$Message, [string]$Level = "INFO")
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Write-Host "[$timestamp] $Level - $Message"
+}
+
+try {
+    # 读取配置文件
+    if (!(Test-Path $ConfigFile)) {
+        throw "配置文件 '$ConfigFile' 不存在"
+    }
+    
+    $config = Get-Content $ConfigFile | ConvertFrom-Json
+
+    # 设置参数，命令行参数优先级高于配置文件
+    $recordingPath = if ($Recording) { $Recording } else { $config.recordings }
+    $startAddr = if ($StartAddress) { $StartAddress } else { $config.startAddress }
+    $resultDirectory = if ($ResultDir) { $ResultDir } else { $config.resultDir }
+
+    # 设置认证环境变量
+    if ($Username) {
+        $env:$config.userNameKey = $Username
+    }
+    if ($Password) {
+        $env:$config.passwordKey = $Password
+    }
+
+    # 验证认证信息
+    if ($config.authentication -eq "UserPassword") {
+        if (!(Get-Item env:$($config.userNameKey) -ErrorAction Ignore)) {
+            throw "未设置用户名环境变量。请使用 -Username 参数或设置 $($config.userNameKey) 环境变量"
+        }
+        if (!(Get-Item env:$($config.passwordKey) -ErrorAction Ignore)) {
+            throw "未设置密码环境变量。请使用 -Password 参数或设置 $($config.passwordKey) 环境变量"
+        }
+    }
+
+    # 确保结果目录存在
+    if (!(Test-Path $resultDirectory)) {
+        New-Item -ItemType Directory -Path $resultDirectory -Force | Out-Null
+        Write-Log "创建结果目录: $resultDirectory"
+    }
+
+    # 构建命令参数
+    $replayArgs = @(
+        $recordingPath,
+        "-StartAddress", $startAddr,
+        "-ResultDir", $resultDirectory,
+        "-Authentication", $config.authentication,
+        "-UserNameKey", $config.userNameKey,
+        "-PasswordKey", $config.passwordKey
+    )
+
+    # 添加可选参数
+    if ($config.timeout) {
+        $replayArgs += "-Timeout"
+        $replayArgs += $config.timeout
+    }
+    if ($config.maxRetries) {
+        $replayArgs += "-MaxRetries"
+        $replayArgs += $config.maxRetries
+    }
+    if ($config.retryDelay) {
+        $replayArgs += "-RetryDelay"
+        $replayArgs += $config.retryDelay
+    }
+
+    # 执行测试
+    Write-Log "开始执行测试..."
+    Write-Log "录制文件: $recordingPath"
+    Write-Log "目标地址: $startAddr"
+    Write-Log "结果目录: $resultDirectory"
+    Write-Log "认证方式: $($config.authentication)"
+
+    # 捕获详细输出
+    $output = & npx replay $replayArgs 2>&1 | Tee-Object -Variable cmdOutput
+    
+    # 将输出写入日志文件
+    $logFile = Join-Path $resultDirectory "test-execution.log"
+    $cmdOutput | Out-File -FilePath $logFile -Encoding UTF8
+
+    # 检查执行结果
+    if ($LASTEXITCODE -eq 0) {
+        Write-Log "测试执行成功完成" "SUCCESS"
+        Write-Log "详细日志已保存到: $logFile" "INFO"
+        
+        # 如果结果目录中有测试报告，将其位置输出到控制台
+        $reportFile = Join-Path $resultDirectory "report.html"
+        if (Test-Path $reportFile) {
+            Write-Log "测试报告位置: $reportFile" "INFO"
+        }
+    } else {
+        Write-Log "测试执行失败，退出码: $LASTEXITCODE" "ERROR"
+        Write-Log "错误详情：`n$cmdOutput" "ERROR"
+        throw "测试执行失败，详细信息请查看日志文件: $logFile"
+    }
+}
+catch {
+    Write-Log "执行出错: $_" "ERROR"
+    Write-Log "堆栈跟踪: $($_.ScriptStackTrace)" "DEBUG"
+    
+    # 确保错误信息被正确传递给 Azure Pipeline
+    Write-Host "##vso[task.complete result=Failed;]$_"
+    exit 1
+} 
+
+
+
+steps:
+- task: PowerShell@2
+  inputs:
+    targetType: 'filePath'
+    filePath: 'run-bc-replay.ps1'
+    arguments: '-Recording ".\recordings\*.yml" -StartAddress "http://localhost:8080/bc250/" -ResultDir "c:\bc-replay\result"'
+    failOnStderr: true
+  displayName: '运行 BC-Replay 测试'
+
+# 如果需要发布测试结果和日志
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: 'c:\bc-replay\result'
+    artifact: 'TestResults'
+    publishLocation: 'pipeline'
+  condition: always()
 
 
 
 
+主要改进包括：
+使用 Tee-Object 同时捕获并显示输出
+将详细日志保存到文件
+使用 Write-Host "##vso[task.complete result=Failed;]$_" 确保错误正确地反馈给 Azure Pipeline
+添加了测试报告位置的输出
+使用 PublishPipelineArtifact 任务保存测试结果
+这样配置后，你可以：
+在 Pipeline 运行日志中实时查看执行过程
+在运行失败时看到详细的错误信息
+在 Pipeline 构建结果中下载完整的测试结果和日志
+通过 Pipeline 的 Artifacts 查看测试报告和详细日志
+如果测试失败，错误信息会：
+显示在 Pipeline 日志中
+保存在结果目录的 test-execution.log 文件中
+导致 Pipeline 任务失败并显示错误信息
 
 
 
