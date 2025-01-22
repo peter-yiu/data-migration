@@ -1,0 +1,69 @@
+trigger:
+  - main  # 或者您的主分支名称
+
+pool:
+  vmImage: 'windows-latest'  # 使用 Windows 代理
+
+variables:
+  BC_USERNAME: $(bcUsername)  # 从 pipeline 变量中获取
+  BC_PASSWORD: $(bcPassword)  # 从 pipeline 变量中获取
+
+steps:
+- task: PowerShell@2
+  displayName: '运行 BC-Replay 测试'
+  inputs:
+    targetType: 'inline'
+    script: |
+      # 创建结果目录
+      New-Item -ItemType Directory -Force -Path "c:\bc-replay\result"
+      
+      # 安装依赖
+      npm install
+      npx playwright install
+      
+      # 运行测试并捕获输出
+      $env:BC_USERNAME = "$(bcUsername)"
+      $env:BC_PASSWORD = "$(bcPassword)"
+      
+      try {
+        $output = & npx replay .\recordings\*.yml -StartAddress http://localhost:8080/bc250/ -ResultDir c:\bc-replay\result 2>&1
+        $exitCode = $LASTEXITCODE
+        
+        # 输出执行结果
+        Write-Host "测试执行输出:"
+        Write-Host $output
+        
+        if ($exitCode -ne 0) {
+          Write-Error "测试执行失败，退出码: $exitCode"
+          exit $exitCode
+        }
+      }
+      catch {
+        Write-Error "执行出错: $_"
+        Write-Error "堆栈跟踪: $($_.ScriptStackTrace)"
+        exit 1
+      }
+
+- task: PublishTestResults@2
+  displayName: '发布测试结果'
+  inputs:
+    testResultsFormat: 'JUnit'
+    testResultsFiles: 'c:\bc-replay\result\results.xml'
+    failTaskOnFailedTests: true
+  condition: always()  # 即使测试失败也发布结果
+
+- task: PublishPipelineArtifact@1
+  displayName: '发布测试报告和日志'
+  inputs:
+    targetPath: 'c:\bc-replay\result'
+    artifact: 'TestResults'
+    publishLocation: 'pipeline'
+  condition: always()  # 即使测试失败也发布结果
+
+- task: PublishPipelineArtifact@1
+  displayName: '发布错误截图'
+  inputs:
+    targetPath: '$(System.DefaultWorkingDirectory)/login-error.png'
+    artifact: 'ErrorScreenshots'
+    publishLocation: 'pipeline'
+  condition: failed()  # 仅在失败时发布截图 
