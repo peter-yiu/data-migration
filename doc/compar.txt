@@ -9,9 +9,15 @@ function Compare-Folders {
         [string]$Path2
     )
 
-    # 获取文件夹中的所有文件及子文件夹的文件（递归）
-    $files1 = Get-ChildItem -Path $Path1 -Recurse | Where-Object { -not $_.PSIsContainer }
-    $files2 = Get-ChildItem -Path $Path2 -Recurse | Where-Object { -not $_.PSIsContainer }
+    # 获取文件夹中的所有文件及子文件夹的文件（递归），排除log文件夹及其内容
+    $files1 = Get-ChildItem -Path $Path1 -Recurse | Where-Object { 
+        -not $_.PSIsContainer -and 
+        (Split-Path $_.FullName -Parent).Split([IO.Path]::DirectorySeparatorChar) -notcontains 'log'
+    }
+    $files2 = Get-ChildItem -Path $Path2 -Recurse | Where-Object { 
+        -not $_.PSIsContainer -and 
+        (Split-Path $_.FullName -Parent).Split([IO.Path]::DirectorySeparatorChar) -notcontains 'log'
+    }
 
     # 创建相对路径映射
     $hash1 = @{}
@@ -32,9 +38,23 @@ function Compare-Folders {
             # 比较文件内容
             $file1 = $hash1[$relativePath]
             $file2 = $hash2[$relativePath]
-            if ((Get-FileHash $file1.FullName).Hash -ne (Get-FileHash $file2.FullName).Hash) {
-                Write-Host "File content differs: $relativePath"
-                exit 1
+            
+            # 对yml文件进行特殊处理
+            if ($file1.Extension -eq '.yml' -or $file1.Extension -eq '.yaml') {
+                # 读取文件内容并标准化换行符
+                $content1 = (Get-Content -Path $file1.FullName -Raw).Replace("`r`n", "`n").Trim()
+                $content2 = (Get-Content -Path $file2.FullName -Raw).Replace("`r`n", "`n").Trim()
+                
+                if ($content1 -ne $content2) {
+                    Write-Host "File content differs: $relativePath"
+                    exit 1
+                }
+            } else {
+                # 其他文件使用哈希值比较
+                if ((Get-FileHash $file1.FullName).Hash -ne (Get-FileHash $file2.FullName).Hash) {
+                    Write-Host "File content differs: $relativePath"
+                    exit 1
+                }
             }
         }
     }
