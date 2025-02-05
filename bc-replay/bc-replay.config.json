@@ -1,0 +1,14 @@
+{
+  "startAddress": "http://localhost:8080/bc250/",
+  "resultDir": "c:/bc-replay/result",
+  "recordings": "./recordings/*.yml",
+  "timeout": 120000,
+  "maxRetries": 3,
+  "retryDelay": 5,
+  "authentication": "UserPassword",
+  "userNameKey": "BC_USERNAME",
+  "passwordKey": "BC_PASSWORD",
+  "navigationTimeout": 60000,
+  "headed": true,
+  "slowMo": 1000
+} 

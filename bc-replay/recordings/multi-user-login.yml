@@ -1,0 +1,53 @@
+name: "多用户参数化登录测试"
+
+parameters:
+  baseUrl: "http://localhost:8080/bc250"
+
+variables:
+  timestamp: "${NOW:yyyyMMddHHmmss}"
+
+iterations:
+  - data:
+      username: "user1"
+      password: "pass1"
+  - data:
+      username: "user2"
+      password: "pass2"
+  - data:
+      username: "user3"
+      password: "pass3"
+
+steps:
+  - type: "navigate"
+    url: "${parameters.baseUrl}/login"
+  
+  - type: "waitForSelector"
+    selector: "#loginForm"
+    timeout: 10000
+  
+  - type: "fill"
+    selector: "#username"
+    value: "${data.username}"
+  
+  - type: "fill"
+    selector: "#password"
+    value: "${data.password}"
+  
+  - type: "click"
+    selector: "#loginButton"
+  
+  - type: "expect"
+    selector: ".user-info"
+    assertion: "toContainText"
+    value: "${data.username}"
+    timeout: 10000
+  
+  - type: "screenshot"
+    path: "c:/bc-replay/result/screenshots/${data.username}-${variables.timestamp}.png"
+  
+  - type: "click"
+    selector: "#logoutButton"
+  
+  - type: "expect"
+    selector: "#loginForm"
+    assertion: "toBeVisible" 

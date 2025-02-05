@@ -1,0 +1,45 @@
+name: "创建客户测试"
+
+parameters:
+  baseUrl: "${START_URL}"
+
+variables:
+  timestamp: "${NOW:yyyyMMddHHmmss}"
+
+iterations:
+  - data:
+      customerName: "${data.name}"
+      customerType: "${data.type}"
+      contactPerson: "${data.contact}"
+      phone: "${data.phone}"
+
+steps:
+  - type: "navigate"
+    url: "${parameters.baseUrl}/customers"
+  
+  - type: "click"
+    selector: "#newCustomerBtn"
+  
+  - type: "fill"
+    selector: "#customerName"
+    value: "${data.customerName}"
+  
+  - type: "select"
+    selector: "#customerType"
+    value: "${data.customerType}"
+  
+  - type: "fill"
+    selector: "#contactPerson"
+    value: "${data.contactPerson}"
+  
+  - type: "fill"
+    selector: "#phone"
+    value: "${data.phone}"
+  
+  - type: "click"
+    selector: "#saveButton"
+  
+  - type: "expect"
+    selector: ".notification"
+    assertion: "toContainText"
+    value: "客户创建成功" 

@@ -1,0 +1,43 @@
+
+
+4. 创建业务相关的数据文件:
+
+创建业务相关的数据文件:
+Excel 文件 (customers.xlsx):
+| CustomerName | CustomerType | ContactPerson | Phone |
+|--------------|-------------|---------------|-------|
+| 测试客户1 | VIP | 张三 | 13800000001 |
+| 测试客户2 | 普通 | 李四 | 13800000002 |
+
+
+
+TestAutomation/
+├── Modules/
+│   └── TestHelper.psm1
+├── Templates/
+│   ├── create-customer-test.yml
+│   ├── create-order-test.yml
+│   └── create-invoice-test.yml
+├── Scripts/
+│   ├── Generate-CustomerTest.ps1
+│   ├── Generate-OrderTest.ps1
+│   └── Generate-InvoiceTest.ps1
+├── TestData/
+│   ├── customers.xlsx
+│   ├── orders.xlsx
+│   └── invoices.xlsx
+└── azure-pipeline.yml
+
+
+这种结构的优点:
+模块化设计,便于维护
+通用功能集中管理
+各业务测试相对独立
+便于扩展新的测试场景
+统一的数据处理方式
+使用时:
+为新业务创建模板文件
+创建对应的生成脚本
+准备测试数据 Excel
+在 Pipeline 中配置参数
+这样就能方便地添加新的业务测试场景了。

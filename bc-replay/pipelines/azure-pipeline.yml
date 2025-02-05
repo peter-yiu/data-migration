@@ -1,0 +1,27 @@
+parameters:
+  - name: testType
+    type: string
+    default: 'customer'
+    values:
+      - 'customer'
+      - 'order'
+      - 'invoice'
+
+steps:
+# 根据测试类型选择不同的生成脚本
+- task: PowerShell@2
+  inputs:
+    targetType: 'filePath'
+    filePath: 'Scripts/Generate-$(testType)Test.ps1'
+    arguments: >
+      -ExcelPath "$(Build.SourcesDirectory)\TestData\$(testType)s.xlsx"
+      -OutputPath "$(Build.SourcesDirectory)\recordings"
+  displayName: '生成 $(testType) 测试脚本'
+
+# 执行测试
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      npx replay .\recordings\*.yml -StartAddress http://localhost:8080/bc250/ -ResultDir $(Build.ArtifactStagingDirectory)\result
+  displayName: '执行测试'

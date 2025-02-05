@@ -6,3 +6,53 @@
     arguments: '-DaysToKeep 30 -ShareFolder "\\your-server\share\test-reports"'
   displayName: '清理旧报告'
   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main')) 
+
+steps:
+# 从 Key Vault 获取密码并设置为环境变量
+- task: AzureKeyVault@2
+  inputs:
+    azureSubscription: 'Your-Azure-Subscription'
+    KeyVaultName: 'Your-KeyVault-Name'
+    SecretsFilter: '*'
+    RunAsPreJob: true
+
+# 生成测试脚本
+- task: PowerShell@2
+  inputs:
+    targetType: 'filePath'
+    filePath: 'generate-login-test.ps1'
+    arguments: >
+      -ExcelPath "$(Build.SourcesDirectory)\TestData\users.xlsx"
+      -OutputPath "$(Build.SourcesDirectory)\recordings"
+
+# 执行测试，环境变量会自动从 Key Vault 中获取
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      npx replay .\recordings\*.yml -StartAddress http://localhost:8080/bc250/ -ResultDir $(Build.ArtifactStagingDirectory)\result
+  env:
+    SECRET_USER1: $(user1-password)  # Key Vault secrets 会自动映射为 pipeline 变量
+    SECRET_USER2: $(user2-password)
+    SECRET_USER3: $(user3-password)
+
+- task: PublishPipelineArtifact@1
+  inputs:
+    targetPath: '$(Build.ArtifactStagingDirectory)\result'
+    artifact: 'TestResults'
+    publishLocation: 'pipeline'
+  condition: always() 
+
+
+#   这种方式的优点：
+# 生成的 yml 文件中不包含实际密码，只包含环境变量引用
+# 密码保存在 Key Vault 中，更安全
+# 运行时通过环境变量动态注入密码
+# Pipeline 中的密码变量不会显示在日志中
+# Excel 文件示例：
+# | Username | SecretName | Role |
+# |----------|------------|------|
+# | user1 | USER1 | admin |
+# | user2 | USER2 | operator |
+# | user3 | USER3 | viewer |
+# 这样就能确保密码信息的安全性了。
