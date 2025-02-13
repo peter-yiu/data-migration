@@ -421,3 +421,43 @@ type: inputtarget :
 page:Customer listscope:filterfield:Novalue:=Parameters,'customer List - No."
 僾摻贼5:33 /34:05
 Can also be used in expressions in the
+
+
+description: Customer recording
+parameters:
+  Customer List - No.:
+    type: string
+    default: "10000"
+steps :
+  - type: input
+    target :
+      page:Customer list
+      scope:filter
+      field:No
+      value:=Parameters,'customer List - No."
+
+
+
+
+description: Customer recording
+parameters:
+  baseUrl: "${START_URL}"         # bc-replay 内置支持的环境变量
+
+steps:
+  - type: "navigate"
+    url: "${START_URL}"
+
+  - type: input
+    target:
+      page: "Customer list"
+      scope: "filter"
+      field: "No"
+      value: "${env.CUSTOMER_NO}"     # 正确的环境变量引用方式
+
+  - type: expect
+    selector: ".customer-record"
+    assertion: "toContainText"
+    value: "${env.CUSTOMER_NAME}"     # 正确的环境变量引用方式
+
+  - type: "screenshot"
+    path: "c:/bc-replay/result/screenshots/customer-${env.CUSTOMER_NO}.png"
