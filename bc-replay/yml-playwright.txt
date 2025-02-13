@@ -409,3 +409,15 @@ await runTest('test-with-params.yml', {
 与 CI/CD 集成
 支持复杂的参数处理逻辑
 记得在文档中说明参数的使用方法和支持的格式。
+
+
+Parameterize scripts (YAML editing only)
+Add parameters(variables) to scriptsExample:Customer List-No.=10000
+Use parameters in steps as a valueAdded to a Parameters collection in YAMLExample: value := Parameters.Customer List-No.
+descriptionTest recordingparametersCustomer List - No.
+type: stringdefault:"10000"
+steps :
+type: inputtarget :
+page:Customer listscope:filterfield:Novalue:=Parameters,'customer List - No."
+僾摻贼5:33 /34:05
+Can also be used in expressions in the
