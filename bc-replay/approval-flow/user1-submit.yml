@@ -1,0 +1,75 @@
+description: User1 修改实体并获取审批号
+start: /entity-list
+timeout: 300
+
+steps:
+  - description: 等待列表加载
+    action: waitForSelector
+    selector: ".entity-table"
+    
+  - description: 点击第一行编辑按钮
+    action: click  
+    selector: "tr:first-child .edit-button"
+
+  - description: 修改forename字段
+    action: fill
+    selector: "#forename-input"
+    value: "Test Name"
+
+  - description: 点击保存
+    action: click
+    selector: "#save-button"
+
+  - description: 等待审批号消息框
+    action: waitForSelector
+    selector: ".message-dialog"
+
+  - description: 获取approval number
+    type: "$"
+    selector: ".message-dialog"
+    expression: |
+      (element) => {
+        const approvalNo = element.querySelector('.approval-number').textContent;
+        console.log('APPROVAL_NO=' + approvalNo);
+        return approvalNo;
+      } 
+
+
+
+  - description: 获取approval number
+    type: "evaluate"
+    selector: ".message-dialog"
+    expression: |
+      (element) => {
+        const approvalNo = element.querySelector('.approval-number').textContent;
+        console.log('APPROVAL_NO=' + approvalNo);
+        return approvalNo;
+      }
+
+
+
+
+$env:BC_USER = "user1"
+$env:BC_PASSWORD = "user1_password"
+Write-Host "Running user1 submit test..."
+
+# 执行测试并获取输出
+$output = & npx replay ./user1-submit.yml -StartAddress "https://your-bc-url" 2>&1
+$approvalNo = $output | Select-String -Pattern "APPROVAL_NO=(\w+)" | ForEach-Object { $_.Matches.Groups[1].Value }
+
+# 将审批号复制到剪贴板
+$approvalNo | Set-Clipboard
+
+# Manager1 审批
+$env:BC_USER = "manager1"
+$env:BC_PASSWORD = "manager1_password" 
+Write-Host "Running manager1 approve test..."
+
+# 从剪贴板获取审批号
+$approvalNo = Get-Clipboard
+Write-Host "从剪贴板获取的审批号: $approvalNo"
+
+npx replay ./manager1-approve.yml -StartAddress "https://your-bc-url"
+
+      
+在 bc-replay 中，对于执行 JavaScript 代码的操作，应该使用 `type: "$"` 或者 `type: "evaluate"`。根据您的需求，我们可以这样写：

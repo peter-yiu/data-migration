@@ -1,0 +1,30 @@
+description: User1 修改entity并获取approval number
+start:
+  profile: "User1 Profile"
+
+steps:
+  - description: 导航到entity列表页面
+    navigate: /entity-list  # 根据实际URL调整
+
+  - description: 选择要修改的entity
+    click: "#entityGrid tr:first-child .edit-button"  # 根据实际选择器调整
+
+  - description: 修改forename字段
+    fill: "#forenameField"
+    value: "New Name Test"
+
+  - description: 保存修改
+    click: "#saveButton"
+
+  - description: 等待approval消息框出现
+    waitFor: "#approvalMessageDialog"
+
+  - description: 获取approval number
+    $: |
+      const approvalNo = document.querySelector('#approvalMessageDialog .approval-number').textContent;
+      // 将approval number保存到环境变量
+      process.env.APPROVAL_NO = approvalNo;
+      console.log('Approval Number:', approvalNo);
+
+  - description: 确认消息框
+    click: "#approvalMessageDialog .ok-button"

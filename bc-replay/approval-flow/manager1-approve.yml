@@ -1,0 +1,29 @@
+description: Manager1 审批流程
+start: /approval-list
+timeout: 300
+
+steps:
+  - description: 等待审批列表加载
+    action: waitForSelector
+    selector: ".approval-table"
+
+  - description: 在搜索框输入审批号
+    action: fill
+    selector: "#search-input" 
+    value: ${APPROVAL_NO}
+
+  - description: 点击搜索
+    action: click
+    selector: "#search-button"
+
+  - description: 等待搜索结果
+    action: waitForSelector
+    selector: "tr:first-child"
+
+  - description: 点击审批按钮
+    action: click
+    selector: "tr:first-child .approve-button"
+
+  - description: 确认审批
+    action: click 
+    selector: ".confirm-dialog .yes-button" 
