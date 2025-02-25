@@ -103,4 +103,11 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 echo PowerShell script completed successfully
-exit /b 0 
+exit /b 0
+
+
+
+const approvalNo = await page.evaluate(async () => {
+    return await navigator.clipboard.readText();
+});
+console.log(`Approval No: ${approvalNo}`);
