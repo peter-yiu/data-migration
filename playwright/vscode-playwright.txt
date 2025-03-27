@@ -1,0 +1,33 @@
+让VS Code Playwright插件默认生成JavaScript代码的步骤：
+修改VS Code设置：
+打开VS Code设置 (Ctrl+,)
+搜索 "playwright"
+找到 "Playwright > Language" 设置
+将其设置为 "javascript" 而不是 "typescript"
+如果没有找到该设置，可以直接编辑settings.json：
+打开命令面板 (Ctrl+Shift+P)
+输入 "Preferences: Open Settings (JSON)"
+添加以下配置：
+  "playwright.language": "javascript"
+
+创建playwright.config.js而不是playwright.config.ts：
+确保项目根目录使用的是JavaScript配置文件
+这会影响生成的测试文件类型
+在项目中设置默认语言：
+在项目根目录创建.vscode/settings.json文件
+添加以下内容：
+{
+     "playwright.language": "javascript"
+   }
+
+使用命令行参数：
+使用命令行录制时，指定JavaScript作为目标语言：
+ npx playwright codegen --target javascript
+
+检查项目配置：
+确保package.json中的codegen脚本指定了JavaScript：
+ "scripts": {
+     "codegen": "playwright codegen --target javascript"
+   }
+如果以上方法都不起作用，你可能需要检查Playwright插件的版本，并考虑更新到最新版本，因为较新版本可能提供更多配置选项。
+使用这些设置后，VS Code的Playwright插件应该会默认生成JavaScript格式的测试脚本。
