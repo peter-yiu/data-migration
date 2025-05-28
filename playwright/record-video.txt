@@ -1,0 +1,17 @@
+// ... existing code ...
+
+        // 设置录制参数
+        const ffmpegArgs = [
+            '-f', 'gdigrab',
+            '-framerate', framerate.toString(),
+            '-i', 'title=Chromium', // 修改这里，通过窗口标题来捕获特定窗口
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-crf', quality.toString(),
+            videoPath
+        ];
+
+// ... existing code ...
+
+
+ffmpeg -f gdigrab -i title=dummy -list_devices true -f dshow -i dummy
