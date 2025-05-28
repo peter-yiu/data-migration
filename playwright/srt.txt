@@ -1,0 +1,143 @@
+
+我来详细说明字幕文件的格式规范：
+SRT 格式说明（最常用）：
+
+1                                    <- 字幕序号
+00:00:01,000 --> 00:00:04,000       <- 时间码（开始时间 --> 结束时间）
+这是第一行字幕                        <- 字幕内容
+
+2
+00:00:04,500 --> 00:00:08,000
+这是第二行字幕
+
+SRT 格式规则：
+每个字幕块由三部分组成：序号、时间码、字幕内容
+序号：从1开始的递增数字
+时间码格式：小时:分钟:秒,毫秒
+时间码使用 --> 箭头连接（注意箭头前后有空格）
+字幕块之间用空行分隔
+文件编码推荐使用 UTF-8
+2. ASS/SSA 格式示例（支持更多样式）：
+[Script Info]
+Title: 示例字幕
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,这是第一行字幕
+Dialogue: 0,0:00:04.50,0:00:08.00,Default,,0,0,0,,这是第二行字幕
+
+
+
+3.VTT 格式示例（网页视频常用）：
+WEBVTT
+
+1
+00:00:01.000 --> 00:00:04.000
+这是第一行字幕
+
+2
+00:00:04.500 --> 00:00:08.000
+这是第二行字幕
+
+实用技巧：
+1 时间码格式说明：
+00:00:01,000
+└┬┘ └┬┘ └┬┘
+ 小时 分钟 秒,毫秒
+
+常见错误避免：
+确保时间码格式正确（包括逗号和箭头）
+保持字幕块之间有空行
+序号必须连续
+时间不能重叠
+检查文件编码（推荐 UTF-8）
+
+多行字幕：
+1
+00:00:01,000 --> 00:00:04,000
+第一行
+第二行
+
+2
+00:00:04,500 --> 00:00:08,000
+这是单行字幕
+
+
+
+字幕文件命名建议：
+与视频文件同名，仅扩展名不同
+例如：
+视频：movie.mp4
+字幕：movie.srt
+编辑工具推荐：
+Aegisub（专业字幕编辑器）
+Subtitle Edit（功能全面）
+Visual Studio Code（安装字幕插件）
+记住：在使用我们的脚本时，确保字幕文件格式正确，这样才能确保成功合并到视频中。如果遇到编码问题，可以使用编辑器（如 Notepad++）将文件转换为 UTF-8 编码。
+
+
+
+以下是一些处理字幕文件非常有用的 VS Code 插件推荐：
+Subtitles Editor
+ID: pepri.subtitles-editor
+功能：
+支持 .srt、.vtt 文件的编辑
+实时预览
+时间码自动格式化
+字幕块的添加、删除、合并
+支持字幕时间偏移调整
+SRT Language
+ID: rioj7.srt
+功能：
+.srt 文件语法高亮
+时间码格式检查
+序号自动补全
+Subtitle Support
+ID: zhangciwu.subtitle-support
+功能：
+支持多种字幕格式（.srt, .ass, .ssa）
+语法高亮
+格式检查
+时间轴调整
+WebVTT Language
+ID: adamhwang.vtt
+功能：
+.vtt 文件的语法高亮
+WebVTT 格式支持
+安装方法：
+打开 VS Code
+按 Ctrl+Shift+X 打开扩展面板
+搜索上述插件名称
+点击 "Install" 安装
+使用技巧：
+Subtitles Editor 使用方法：
+
+
+
+编码问题处理：
+VS Code 右下角可以直接切换文件编码
+建议统一使用 UTF-8 编码
+如果出现中文乱码，可以尝试切换到 UTF-8 with BOM
+
+
+// settings.json 中的推荐设置
+{
+    "files.associations": {
+        "*.srt": "subtitles",
+        "*.vtt": "vtt"
+    },
+    "editor.wordWrap": "on",  // 字幕长文本自动换行
+    "files.encoding": "utf8"  // 默认使用 UTF-8 编码
+}
+
+
+批量处理功能：
+使用 VS Code 的多文件搜索替换
+支持正则表达式
+可以批量调整时间码
+这些插件可以大大提高字幕编辑的效率，特别是在处理大量字幕文件时。建议根据具体需求选择合适的插件使用。如果主要处理 .srt 文件，推荐安装 "Subtitles Editor" 和 "SRT Language" 这两个插件。
