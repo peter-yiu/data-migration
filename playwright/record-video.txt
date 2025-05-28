@@ -15,3 +15,8 @@
 
 
 ffmpeg -f gdigrab -i title=dummy -list_devices true -f dshow -i dummy
+
+
+. Playwright 的内置视频录制功能 (实验性/高层 API)
+
+    方案概述： Playwright 实际上提供了自己的视频录制功能，通常通过 browser.newContext({ recordVideo: { dir: 'videos/' } }) 或 page.startRecording() (实验性) 来实现。它会在后台捕获页面内容并生成视频。
