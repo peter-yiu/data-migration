@@ -33,6 +33,38 @@ Dialogue: 0,0:00:04.50,0:00:08.00,Default,,0,0,0,,这是第二行字幕
 
 
 
+[Script Info]
+Title: 简单字幕
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00000000,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,0,0,0,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:04.00,Default,,0,0,0,,这是第一行字幕
+Dialogue: 0,0:00:04.50,0:00:08.00,Default,,0,0,0,,这是第二行字幕
+
+
+
+
+
+主要更改说明：
+PrimaryColour 改为 &H00000000（纯黑色）
+BorderStyle 改为 0（无边框）
+Outline 改为 0（无描边）
+Shadow 改为 0（无阴影）
+颜色代码说明：
+&H00000000 表示纯黑色
+格式为：&HAABBGGRR（AA=透明度，BB=蓝色，GG=绿色，RR=红色）
+如果你想要其他颜色：
+纯红色：&H000000FF
+纯绿色：&H0000FF00
+纯蓝色：&H00FF0000
+这样设置后的字幕将会是最简单的黑色文字，没有任何特效修饰。
+
+
 3.VTT 格式示例（网页视频常用）：
 WEBVTT
 
